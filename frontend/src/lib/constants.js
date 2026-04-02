@@ -67,4 +67,6 @@ export const NAV_ITEMS = [
 ];
 
 // ===== API =====
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+// VITE_API_URL should be the backend's base URL (e.g. https://vouch-api.onrender.com)
+const _apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = _apiBase.endsWith('/api/v1') ? _apiBase : `${_apiBase.replace(/\/+$/, '')}/api/v1`;
