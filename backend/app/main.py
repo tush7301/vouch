@@ -1,10 +1,14 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.schemas.schemas import HealthCheck
+from app.database import get_db
+from app.models.user import User
 from app.routers import auth, users, experiences, ratings, feed, friends, wishlist, map as map_router
 import app.models  # noqa: F401 — ensure all models are registered before queries
 
@@ -45,3 +49,9 @@ app.include_router(map_router.router, prefix=settings.API_V1_STR)
 @app.get("/health", response_model=HealthCheck, tags=["health"])
 def health_check():
     return HealthCheck(status="ok", version=settings.VERSION)
+
+
+@app.get("/api/user-count", tags=["metrics"])
+def user_count(db: Session = Depends(get_db)):
+    count = db.query(func.count(User.id)).scalar()
+    return {"user_count": count}

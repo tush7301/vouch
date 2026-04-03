@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import VouchLogo from '../components/ui/VouchLogo';
+import { trackLoginPageViewed, trackSignupStarted, trackLoginCompleted, trackSignupCompleted } from '../lib/analytics';
 
 const GOOGLE_CLIENT_ID = '745899766698-58m0aqf28p5v5kll7vhc0lbjrnd8rcjr.apps.googleusercontent.com';
 
@@ -52,6 +53,9 @@ export default function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Track login page view
+  useEffect(() => { trackLoginPageViewed(); }, []);
+
   useEffect(() => {
     if (googleInitialized.current) return;
 
@@ -65,6 +69,7 @@ export default function Login() {
           setError('');
           try {
             const user = await loginGoogle(response.credential);
+            trackLoginCompleted(user, 'google');
             navigate(user.onboarding_complete ? '/' : '/onboarding');
           } catch (err) {
             setError(err.message || 'Google login failed');
@@ -92,10 +97,13 @@ export default function Login() {
     setSubmitting(true);
     try {
       if (mode === 'register') {
+        trackSignupStarted('email');
         const user = await register({ email, username, display_name: displayName, password });
+        trackSignupCompleted(user);
         navigate(user.onboarding_complete ? '/' : '/onboarding');
       } else {
         const user = await login({ email, password });
+        trackLoginCompleted(user, 'email');
         navigate(user.onboarding_complete ? '/' : '/onboarding');
       }
     } catch (err) {

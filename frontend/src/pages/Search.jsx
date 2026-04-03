@@ -4,6 +4,7 @@ import { Search, MapPin, Calendar, Star, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { CATEGORIES } from '../lib/constants';
 import { useAuth } from '../context/AuthContext';
+import { trackSearch } from '../lib/analytics';
 
 const TABS = [
   { key: 'places', label: 'Discover Places' },
@@ -51,6 +52,7 @@ export default function SearchPage() {
     if (!query.trim()) return;
     setLoading(true);
     setSearched(true);
+    trackSearch(query, activeTab);
     try {
       if (activeTab === 'local') {
         const data = await api.experiences.search(query, category || undefined);

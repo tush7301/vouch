@@ -4,6 +4,7 @@ import { MapPin, Calendar, Star, Search, Loader2, Flame, Award } from 'lucide-re
 import BookmarkIcon from '../components/ui/BookmarkIcon';
 import { CATEGORIES } from '../lib/constants';
 import { api } from '../lib/api';
+import { trackWishlistAdd } from '../lib/analytics';
 
 const TABS = [
   { key: 'all', label: 'For You' },
@@ -50,8 +51,12 @@ export default function Feed() {
     const wasSaved = savedState[expId];
     setSavedState((s) => ({ ...s, [expId]: !wasSaved }));
     try {
-      if (wasSaved) await api.wishlist.remove(expId);
-      else await api.wishlist.add(expId);
+      if (wasSaved) {
+        await api.wishlist.remove(expId);
+      } else {
+        await api.wishlist.add(expId);
+        trackWishlistAdd(expId);
+      }
     } catch {
       setSavedState((s) => ({ ...s, [expId]: wasSaved }));
     }

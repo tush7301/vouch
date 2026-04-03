@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import SectionLabel from '../components/ui/SectionLabel';
 import VouchLogo from '../components/ui/VouchLogo';
 import { CATEGORIES } from '../lib/constants';
+import { trackOnboardingStarted, trackOnboardingCategoriesSelected, trackOnboardingCompleted } from '../lib/analytics';
 
 /**
  * Onboarding — multi-step survey (welcome → category selection → friend connect → done).
@@ -22,18 +23,26 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => { trackOnboardingStarted(); }, []);
+
   const toggleCategory = (cat) =>
     setSelectedCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
     );
 
-  const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  const next = () => {
+    if (step === 1 && selectedCategories.length > 0) {
+      trackOnboardingCategoriesSelected(selectedCategories);
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  };
 
   const handleFinish = async () => {
     setSaving(true);
     setError('');
     try {
       await completeOnboarding(selectedCategories.join(','));
+      trackOnboardingCompleted();
       navigate('/');
     } catch (err) {
       setError(err.message || 'Failed to save preferences');
