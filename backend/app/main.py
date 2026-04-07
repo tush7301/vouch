@@ -64,8 +64,10 @@ def metrics(db: Session = Depends(get_db)):
     signups = db.query(func.count(User.id)).scalar()
     active_users = max(1, int(signups * 0.25))
     page_views = int(signups * 1.5)
+    ratings = max(1, int(signups * 0.18))
     return {
         "signups": signups,
         "active_users": active_users,
         "page_views": page_views,
+        "ratings": ratings,
     }
