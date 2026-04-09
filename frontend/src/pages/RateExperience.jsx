@@ -7,6 +7,7 @@ import CategoryTag from '../components/ui/CategoryTag';
 import TagPill from '../components/ui/TagPill';
 import { TAGS } from '../lib/constants';
 import { api } from '../lib/api';
+import { trackRatingCreated } from '../lib/analytics';
 
 /**
  * Score slider component — draggable 0–10 score input.
@@ -122,6 +123,7 @@ export default function RateExperience() {
           experience_id: id,
           ...data,
         });
+        trackRatingCreated(id, data.overall_score);
       }
 
       setSuccess(true);

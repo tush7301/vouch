@@ -13,10 +13,10 @@ export default function ChipStrip({ chips, selected, onSelect }) {
           <button
             key={chip}
             onClick={() => onSelect(isActive ? null : chip)}
-            className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-vouch whitespace-nowrap
+            className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-fluid whitespace-nowrap
               ${isActive
-                ? 'bg-charcoal text-cream'
-                : 'bg-warm-white text-text-muted border border-stone hover:border-terracotta hover:text-terracotta'
+                ? 'bg-charcoal text-cream shadow-[0_2px_10px_rgba(26,23,20,0.15)]'
+                : 'glass-pill text-text-muted hover:text-charcoal hover:bg-white/50'
               }`}
           >
             {chip}

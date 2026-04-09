@@ -4,6 +4,7 @@ import { MapPin, Calendar, Star, Search, Loader2, Flame, Award } from 'lucide-re
 import BookmarkIcon from '../components/ui/BookmarkIcon';
 import { CATEGORIES } from '../lib/constants';
 import { api } from '../lib/api';
+import { trackWishlistAdd } from '../lib/analytics';
 
 const TABS = [
   { key: 'all', label: 'For You' },
@@ -17,10 +18,8 @@ export default function Feed() {
   const [experiencesByCategory, setExperiencesByCategory] = useState({});
   const [loading, setLoading] = useState({});
   const [savedState, setSavedState] = useState({});
-  // Maps experience_id → 'vouch_pick' | 'trending'
   const [feedTags, setFeedTags] = useState({});
 
-  // Load wishlist on mount
   useEffect(() => {
     api.wishlist.get()
       .then((items) => {
@@ -31,14 +30,12 @@ export default function Feed() {
       .catch(() => {});
   }, []);
 
-  // Fetch feed tags (vouch_pick / trending) from the feed API
   useEffect(() => {
     api.feed.get(null, null)
       .then((data) => {
         const tags = {};
         (data?.items || []).forEach((item) => {
           if (item.experience?.id && (item.type === 'vouch_pick' || item.type === 'trending')) {
-            // Only set if not already tagged (vouch_pick takes priority)
             if (!tags[item.experience.id]) {
               tags[item.experience.id] = item.type;
             }
@@ -54,17 +51,19 @@ export default function Feed() {
     const wasSaved = savedState[expId];
     setSavedState((s) => ({ ...s, [expId]: !wasSaved }));
     try {
-      if (wasSaved) await api.wishlist.remove(expId);
-      else await api.wishlist.add(expId);
+      if (wasSaved) {
+        await api.wishlist.remove(expId);
+      } else {
+        await api.wishlist.add(expId);
+        trackWishlistAdd(expId);
+      }
     } catch {
       setSavedState((s) => ({ ...s, [expId]: wasSaved }));
     }
   };
 
-  // Track which categories have been loaded (stable ref, no stale closures)
   const loadedRef = useRef(new Set());
 
-  // Fetch experiences for a specific category (or all)
   const fetchCategory = useCallback(async (cat) => {
     const cacheKey = cat || 'all';
     if (loadedRef.current.has(cacheKey)) return;
@@ -73,7 +72,6 @@ export default function Feed() {
     try {
       const params = cat ? { category: cat, limit: 50 } : { limit: 50 };
       const data = await api.experiences.list(params);
-      // Deduplicate by id
       const seen = new Set();
       const unique = (data || []).filter((exp) => {
         if (seen.has(exp.id)) return false;
@@ -82,17 +80,16 @@ export default function Feed() {
       });
       setExperiencesByCategory((prev) => ({ ...prev, [cacheKey]: unique }));
     } catch {
-      loadedRef.current.delete(cacheKey); // allow retry on failure
+      loadedRef.current.delete(cacheKey);
       setExperiencesByCategory((prev) => ({ ...prev, [cacheKey]: [] }));
     } finally {
       setLoading((l) => ({ ...l, [cacheKey]: false }));
     }
   }, []);
 
-  // Fetch on tab change — vouch_picks and trending use the 'all' data
   useEffect(() => {
     if (activeTab === 'vouch_picks') {
-      fetchCategory(null); // ensure 'all' is loaded
+      fetchCategory(null);
     } else {
       const cat = activeTab === 'all' ? null : activeTab;
       fetchCategory(cat);
@@ -103,14 +100,12 @@ export default function Feed() {
   const rawExperiences = experiencesByCategory[cacheKey] || [];
   const isLoading = loading[cacheKey];
 
-  // Filter for Vouch Picks / Trending tabs
   const experiences = activeTab === 'vouch_picks'
     ? rawExperiences.filter((exp) => feedTags[exp.id] === 'vouch_pick')
     : activeTab === 'trending'
       ? rawExperiences.filter((exp) => feedTags[exp.id] === 'trending')
       : rawExperiences;
 
-  // Scroll-reveal observer — query DOM directly to avoid ref timing issues
   const gridRef = useRef(null);
   useEffect(() => {
     if (!gridRef.current) return;
@@ -133,10 +128,10 @@ export default function Feed() {
 
   return (
     <div className="pb-20 lg:pb-8">
-      {/* Search bar */}
+      {/* Search bar — glass input */}
       <div className="px-4 lg:px-8 pt-4 pb-1 max-w-6xl mx-auto">
         <div
-          className="bg-warm-white border border-stone rounded-full px-4 py-3 flex items-center gap-2 cursor-pointer hover:border-terracotta transition-vouch"
+          className="glass-input rounded-full px-4 py-3 flex items-center gap-2 cursor-pointer"
           onClick={() => navigate('/search')}
         >
           <Search className="w-4 h-4 text-secondary-text" />
@@ -144,17 +139,17 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Category tabs */}
+      {/* Category tabs — glass pills */}
       <div className="px-4 lg:px-8 mt-3 max-w-6xl mx-auto">
-        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`pb-2 text-sm font-semibold whitespace-nowrap transition-vouch border-b-2 ${
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-fluid ${
                 activeTab === tab.key
-                  ? 'text-terracotta border-terracotta'
-                  : 'text-text-muted border-transparent hover:text-charcoal'
+                  ? 'bg-charcoal text-cream shadow-[0_2px_10px_rgba(26,23,20,0.15)]'
+                  : 'glass-pill text-text-muted hover:text-charcoal hover:bg-white/50'
               }`}
             >
               {tab.label}
@@ -173,21 +168,23 @@ export default function Feed() {
       {/* Empty state */}
       {!isLoading && experiences.length === 0 && (
         <div className="px-4 lg:px-8 max-w-6xl mx-auto text-center py-16">
-          <Search className="w-10 h-10 text-divider mx-auto mb-3" />
-          <h3 className="font-serif text-lg font-bold mb-1">
-            No experiences yet
-          </h3>
-          <p className="text-sm text-secondary-text mb-4">
-            {activeTab === 'all'
-              ? 'Discover and add places to see them here.'
-              : `No ${activeTab} experiences found yet.`}
-          </p>
-          <button
-            onClick={() => navigate('/search')}
-            className="bg-charcoal text-cream px-6 py-2 rounded-full font-semibold text-sm hover:bg-terracotta transition-vouch"
-          >
-            Discover experiences
-          </button>
+          <div className="glass rounded-2xl p-8 max-w-sm mx-auto">
+            <Search className="w-10 h-10 text-stone mx-auto mb-3" />
+            <h3 className="font-serif text-lg font-bold mb-1">
+              No experiences yet
+            </h3>
+            <p className="text-sm text-secondary-text mb-4">
+              {activeTab === 'all'
+                ? 'Discover and add places to see them here.'
+                : `No ${activeTab} experiences found yet.`}
+            </p>
+            <button
+              onClick={() => navigate('/search')}
+              className="bg-charcoal text-cream px-6 py-2 rounded-full font-semibold text-sm hover:bg-terracotta hover:shadow-[0_4px_20px_rgba(194,101,58,0.25)] transition-fluid"
+            >
+              Discover experiences
+            </button>
+          </div>
         </div>
       )}
 
@@ -217,17 +214,17 @@ export default function Feed() {
   );
 }
 
-/** Experience card for the feed grid. */
+/** Experience card — liquid glass with image overlay. */
 function ExperienceCard({ exp, tag, saved, onToggleSave, onClick }) {
   const isEvent = exp.is_event;
 
   return (
     <div
-      className="bg-warm-white border border-stone-light rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-vouch cursor-pointer group"
+      className="glass rounded-2xl overflow-hidden glass-hover cursor-pointer group"
       onClick={onClick}
     >
       {/* Cover image */}
-      <div className="relative">
+      <div className="relative glass-card-img">
         {exp.cover_photo_url ? (
           <img
             src={exp.cover_photo_url}
@@ -235,10 +232,10 @@ function ExperienceCard({ exp, tag, saved, onToggleSave, onClick }) {
             className="w-full h-40 object-cover"
           />
         ) : (
-          <div className="w-full h-40 bg-surface flex items-center justify-center">
+          <div className="w-full h-40 bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
             {isEvent
-              ? <Calendar className="w-8 h-8 text-divider" />
-              : <MapPin className="w-8 h-8 text-divider" />}
+              ? <Calendar className="w-8 h-8 text-stone" />
+              : <MapPin className="w-8 h-8 text-stone" />}
           </div>
         )}
         <div className="absolute top-2 right-2">
@@ -247,33 +244,33 @@ function ExperienceCard({ exp, tag, saved, onToggleSave, onClick }) {
             onToggle={(e) => onToggleSave(e, exp.id)}
           />
         </div>
-        {/* Feed tag badge */}
+        {/* Feed tag badge — glass pill style */}
         {tag === 'vouch_pick' && (
-          <div className="absolute top-2 left-2 bg-terracotta text-cream text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+          <div className="absolute top-2 left-2 bg-terracotta/90 backdrop-blur-sm text-cream text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
             <Award className="w-3 h-3" />
             Vouch Pick
           </div>
         )}
         {tag === 'trending' && (
-          <div className="absolute top-2 left-2 bg-amber text-cream text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+          <div className="absolute top-2 left-2 bg-amber/90 backdrop-blur-sm text-cream text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
             <Flame className="w-3 h-3" />
             Trending
           </div>
         )}
         {exp.is_event && exp.event_date && (
-          <div className="absolute bottom-2 left-2 bg-charcoal/80 text-cream text-xs px-2 py-1 rounded-full">
+          <div className="absolute bottom-2 left-2 glass-pill text-charcoal text-xs px-2.5 py-1 rounded-full font-medium">
             {new Date(exp.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="p-3">
-        <h3 className="font-serif font-bold text-sm text-primary-text line-clamp-1 group-hover:text-terracotta transition-vouch">
+      <div className="p-3.5">
+        <h3 className="font-serif font-bold text-sm text-primary-text line-clamp-1 group-hover:text-terracotta transition-fluid">
           {exp.name}
         </h3>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs px-2 py-0.5 bg-surface rounded-full text-secondary-text">
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className="text-xs px-2.5 py-0.5 glass-pill rounded-full text-secondary-text font-medium">
             {exp.category}
           </span>
           {exp.subcategory && exp.subcategory !== exp.category && (
@@ -281,19 +278,19 @@ function ExperienceCard({ exp, tag, saved, onToggleSave, onClick }) {
           )}
         </div>
         {exp.neighborhood && (
-          <p className="text-xs text-secondary-text mt-1 flex items-center gap-1">
+          <p className="text-xs text-secondary-text mt-1.5 flex items-center gap-1">
             <MapPin className="w-3 h-3 shrink-0" />
             {exp.neighborhood}
           </p>
         )}
         {!exp.neighborhood && exp.address && (
-          <p className="text-xs text-secondary-text mt-1 flex items-center gap-1 line-clamp-1">
+          <p className="text-xs text-secondary-text mt-1.5 flex items-center gap-1 line-clamp-1">
             <MapPin className="w-3 h-3 shrink-0" />
             {exp.address}
           </p>
         )}
         {exp.description && (
-          <p className="text-xs text-secondary-text/80 mt-1 line-clamp-2">{exp.description}</p>
+          <p className="text-xs text-secondary-text/80 mt-1.5 line-clamp-2">{exp.description}</p>
         )}
       </div>
     </div>

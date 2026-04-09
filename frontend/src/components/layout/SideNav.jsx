@@ -12,8 +12,7 @@ const ICONS = {
 };
 
 /**
- * SideNav — Desktop sidebar navigation (visible lg+).
- * Replaces BottomNav on wide screens.
+ * SideNav — Liquid glass desktop sidebar (visible lg+).
  */
 export default function SideNav() {
   const location = useLocation();
@@ -21,11 +20,10 @@ export default function SideNav() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="hidden lg:flex flex-col w-60 min-h-screen border-r border-stone-light bg-cream fixed top-0 left-0 z-50">
+    <aside className="hidden lg:flex flex-col w-60 min-h-screen glass-solid border-r-0 fixed top-0 left-0 z-50">
       {/* Logo */}
       <div className="px-7 pt-8 pb-6">
         <VouchLogo size="md" />
-        {/* <p className="text-xs text-text-muted mt-1">Your social life, ranked.</p> */}
       </div>
 
       {/* Nav items */}
@@ -40,10 +38,10 @@ export default function SideNav() {
             <NavLink
               key={key}
               to={path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl mb-1 transition-vouch ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl mb-1 transition-fluid ${
                 isActive
-                  ? 'bg-terracotta/10 text-terracotta'
-                  : 'text-text-muted hover:bg-cream-deep hover:text-charcoal'
+                  ? 'glass-nav-active text-terracotta'
+                  : 'text-text-muted hover:bg-white/30 hover:text-charcoal'
               }`}
             >
               <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -56,10 +54,10 @@ export default function SideNav() {
       </nav>
 
       {/* Bottom section */}
-      <div className="px-4 py-5 border-t border-stone-light">
+      <div className="px-4 py-5 border-t border-white/30">
         {user && (
           <div className="flex items-center gap-3 mb-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-terracotta/10 flex items-center justify-center text-xs font-bold text-terracotta">
+            <div className="w-8 h-8 rounded-full bg-terracotta/10 backdrop-blur-sm flex items-center justify-center text-xs font-bold text-terracotta border border-terracotta/10">
               {user.display_name?.charAt(0) || '?'}
             </div>
             <div className="flex-1 min-w-0">
@@ -68,7 +66,7 @@ export default function SideNav() {
             </div>
             <button
               onClick={() => navigate('/settings')}
-              className="text-text-muted hover:text-charcoal transition-vouch shrink-0"
+              className="text-text-muted hover:text-charcoal transition-fluid shrink-0"
             >
               <Settings size={16} />
             </button>
@@ -76,7 +74,7 @@ export default function SideNav() {
         )}
         <button
           onClick={logout}
-          className="flex items-center gap-3 px-4 py-2 rounded-xl text-text-muted hover:bg-cream-deep hover:text-charcoal transition-vouch w-full text-sm font-medium"
+          className="flex items-center gap-3 px-4 py-2 rounded-xl text-text-muted hover:bg-white/30 hover:text-charcoal transition-fluid w-full text-sm font-medium"
         >
           <LogOut size={18} />
           Log out

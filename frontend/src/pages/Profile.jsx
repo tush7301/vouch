@@ -22,16 +22,18 @@ const TABS = [
 // ── Rating Card ────────────────────────────────────────────────
 function RatingCard({ rating, onClick }) {
   return (
-    <Card className="!p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
+    <Card className="!p-0 overflow-hidden cursor-pointer" onClick={onClick}>
       {rating.experience_cover_photo ? (
-        <img
-          src={rating.experience_cover_photo}
-          alt={rating.experience_name}
-          className="w-full h-28 object-cover"
-        />
+        <div className="glass-card-img">
+          <img
+            src={rating.experience_cover_photo}
+            alt={rating.experience_name}
+            className="w-full h-28 object-cover"
+          />
+        </div>
       ) : (
-        <div className="w-full h-28 bg-gradient-to-br from-surface to-divider flex items-center justify-center">
-          <MapPin size={24} className="text-secondary-text" />
+        <div className="w-full h-28 bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
+          <MapPin size={24} className="text-stone" />
         </div>
       )}
       <div className="p-3">
@@ -56,16 +58,18 @@ function RatingCard({ rating, onClick }) {
 // ── Wishlist Card ──────────────────────────────────────────────
 function WishlistCard({ experience, onClick }) {
   return (
-    <Card className="!p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
+    <Card className="!p-0 overflow-hidden cursor-pointer" onClick={onClick}>
       {experience.cover_photo_url ? (
-        <img
-          src={experience.cover_photo_url}
-          alt={experience.name}
-          className="w-full h-28 object-cover"
-        />
+        <div className="glass-card-img">
+          <img
+            src={experience.cover_photo_url}
+            alt={experience.name}
+            className="w-full h-28 object-cover"
+          />
+        </div>
       ) : (
-        <div className="w-full h-28 bg-gradient-to-br from-surface to-divider flex items-center justify-center">
-          <Bookmark size={24} className="text-secondary-text" />
+        <div className="w-full h-28 bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
+          <Bookmark size={24} className="text-stone" />
         </div>
       )}
       <div className="p-3">
@@ -83,7 +87,7 @@ function WishlistCard({ experience, onClick }) {
   );
 }
 
-// ── Edit Profile Modal ─────────────────────────────────────────
+// ── Edit Profile Modal — glass overlay ─────────────────────────
 function EditProfileModal({ user, onClose, onSave }) {
   const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [bio, setBio] = useState(user?.bio || '');
@@ -102,11 +106,11 @@ function EditProfileModal({ user, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 backdrop-blur-sm p-4">
-      <div className="bg-warm-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b border-stone-light">
+    <div className="fixed inset-0 z-50 flex items-center justify-center glass-overlay p-4">
+      <div className="glass-solid rounded-2xl shadow-xl w-full max-w-md animate-fade-up">
+        <div className="flex items-center justify-between p-4 border-b border-white/30">
           <h2 className="font-serif text-lg font-bold">Edit Profile</h2>
-          <button onClick={onClose} className="text-secondary-text hover:text-primary-text text-xl">×</button>
+          <button onClick={onClose} className="text-secondary-text hover:text-primary-text text-xl transition-fluid">×</button>
         </div>
         <div className="p-4 space-y-4">
           <div>
@@ -116,7 +120,7 @@ function EditProfileModal({ user, onClose, onSave }) {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={100}
-              className="mt-1 w-full px-3 py-2 border border-stone rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-terracotta/30 focus:border-terracotta"
+              className="mt-1 w-full px-3 py-2 glass-input rounded-xl text-sm"
             />
           </div>
           <div>
@@ -126,13 +130,13 @@ function EditProfileModal({ user, onClose, onSave }) {
               onChange={(e) => setBio(e.target.value)}
               maxLength={300}
               rows={3}
-              className="mt-1 w-full px-3 py-2 border border-stone rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-terracotta/30 focus:border-terracotta"
+              className="mt-1 w-full px-3 py-2 glass-input rounded-xl text-sm resize-none"
               placeholder="Tell people about yourself..."
             />
             <p className="text-right text-[10px] text-secondary-text mt-0.5">{bio.length}/300</p>
           </div>
         </div>
-        <div className="flex gap-2 p-4 border-t border-stone-light">
+        <div className="flex gap-2 p-4 border-t border-white/30">
           <Button variant="ghost" size="sm" className="flex-1" onClick={onClose}>Cancel</Button>
           <Button
             size="sm"
@@ -148,14 +152,14 @@ function EditProfileModal({ user, onClose, onSave }) {
   );
 }
 
-// ── Followers/Following Modal ──────────────────────────────────
+// ── Followers/Following Modal — glass overlay ──────────────────
 function PeopleModal({ title, people, onClose, onViewProfile }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 backdrop-blur-sm p-4">
-      <div className="bg-warm-white rounded-2xl shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-stone-light">
+    <div className="fixed inset-0 z-50 flex items-center justify-center glass-overlay p-4">
+      <div className="glass-solid rounded-2xl shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col animate-fade-up">
+        <div className="flex items-center justify-between p-4 border-b border-white/30">
           <h2 className="font-serif text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="text-secondary-text hover:text-primary-text text-xl">×</button>
+          <button onClick={onClose} className="text-secondary-text hover:text-primary-text text-xl transition-fluid">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {people.length === 0 ? (
@@ -165,7 +169,7 @@ function PeopleModal({ title, people, onClose, onViewProfile }) {
               <button
                 key={p.id}
                 onClick={() => { onClose(); onViewProfile(p.id); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-cream-deep transition-vouch"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/30 transition-fluid"
               >
                 <Avatar name={p.display_name} src={p.avatar_url} size="md" />
                 <div className="text-left flex-1 min-w-0">
@@ -188,7 +192,6 @@ export default function Profile() {
   const navigate = useNavigate();
   const { userId } = useParams();
 
-  // Determine whose profile we're viewing
   const isOwnProfile = !userId || userId === String(user?.id);
   const profileUserId = isOwnProfile ? user?.id : userId;
 
@@ -199,7 +202,7 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState('ratings');
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
-  const [peopleModal, setPeopleModal] = useState(null); // { title, people }
+  const [peopleModal, setPeopleModal] = useState(null);
   const [isFollowing, setIsFollowing] = useState(false);
 
   const loadProfile = useCallback(async () => {
@@ -235,7 +238,6 @@ export default function Profile() {
     }
   }, [profileUserId, isOwnProfile, user]);
 
-  // Check follow status for other users
   useEffect(() => {
     if (!isOwnProfile && user?.id) {
       api.users.getFollowing(user.id).then((following) => {
@@ -248,7 +250,6 @@ export default function Profile() {
     loadProfile();
   }, [loadProfile]);
 
-  // Keep own profile user in sync
   useEffect(() => {
     if (isOwnProfile && user) setProfileUser(user);
   }, [user, isOwnProfile]);
@@ -303,13 +304,13 @@ export default function Profile() {
         <div className="sticky top-0 z-40 flex items-center justify-end gap-3 px-4 lg:hidden py-3">
           <button
             onClick={() => navigate('/settings')}
-            className="text-text-muted hover:text-charcoal transition-vouch"
+            className="text-text-muted hover:text-charcoal transition-fluid"
           >
             <Settings size={18} />
           </button>
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 text-text-muted hover:text-charcoal transition-vouch"
+            className="flex items-center gap-1.5 text-text-muted hover:text-charcoal transition-fluid"
           >
             <LogOut size={18} />
           </button>
@@ -322,73 +323,75 @@ export default function Profile() {
         </div>
       ) : (
         <div className="px-4 lg:px-8 max-w-6xl mx-auto">
-          {/* User header */}
-          <div className="flex items-center gap-4 mt-4">
-            <Avatar name={profileUser?.display_name || 'User'} src={profileUser?.avatar_url} size="lg" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="font-serif text-xl font-bold truncate">{profileUser?.display_name}</h2>
-                {isOwnProfile && (
-                  <button
-                    onClick={() => setShowEdit(true)}
-                    className="text-text-muted hover:text-terracotta transition-vouch shrink-0"
-                  >
-                    <Edit3 size={14} />
-                  </button>
+          {/* User header — glass card */}
+          <div className="glass rounded-2xl p-5 mt-4">
+            <div className="flex items-center gap-4">
+              <Avatar name={profileUser?.display_name || 'User'} src={profileUser?.avatar_url} size="lg" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-serif text-xl font-bold truncate">{profileUser?.display_name}</h2>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => setShowEdit(true)}
+                      className="text-text-muted hover:text-terracotta transition-fluid shrink-0"
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-terracotta font-medium">@{profileUser?.username}</p>
+                {profileUser?.bio && (
+                  <p className="text-sm text-secondary-text mt-0.5 line-clamp-2">{profileUser.bio}</p>
                 )}
               </div>
-              <p className="text-sm text-terracotta font-medium">@{profileUser?.username}</p>
-              {profileUser?.bio && (
-                <p className="text-sm text-secondary-text mt-0.5 line-clamp-2">{profileUser.bio}</p>
+
+              {/* Average score badge — glass circle */}
+              {stats?.avg_overall_score && (
+                <div className="text-center shrink-0">
+                  <div className="w-14 h-14 rounded-full glass-subtle border-2 border-amber/30 flex items-center justify-center">
+                    <span className="font-serif font-bold text-lg text-charcoal">
+                      {stats.avg_overall_score}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-secondary-text mt-0.5 block">Avg Score</span>
+                </div>
               )}
             </div>
 
-            {/* Average score badge */}
-            {stats?.avg_overall_score && (
-              <div className="text-center shrink-0">
-                <div className="w-14 h-14 rounded-full bg-amber/20 border-2 border-amber flex items-center justify-center">
-                  <span className="font-serif font-bold text-lg text-charcoal">
-                    {stats.avg_overall_score}
-                  </span>
-                </div>
-                <span className="text-[9px] text-secondary-text mt-0.5 block">Avg Score</span>
+            {/* Follow button (other user) */}
+            {!isOwnProfile && (
+              <div className="mt-3">
+                <Button
+                  size="sm"
+                  variant={isFollowing ? 'ghost' : 'primary'}
+                  className="w-full"
+                  onClick={handleFollow}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Button>
               </div>
             )}
           </div>
 
-          {/* Follow button (other user) */}
-          {!isOwnProfile && (
-            <div className="mt-3">
-              <Button
-                size="sm"
-                variant={isFollowing ? 'ghost' : 'primary'}
-                className="w-full"
-                onClick={handleFollow}
-              >
-                {isFollowing ? 'Following ✓' : 'Follow'}
-              </Button>
-            </div>
-          )}
-
-          {/* Stats bar */}
-          <div className="flex items-center justify-between mt-4 py-3 px-4 bg-surface rounded-xl border border-divider">
+          {/* Stats bar — glass surface */}
+          <div className="flex items-center justify-between mt-4 py-3 px-4 glass rounded-2xl">
             <div className="text-center flex-1">
               <p className="font-serif font-bold text-lg">{stats?.rating_count ?? 0}</p>
               <p className="text-[10px] text-secondary-text uppercase font-semibold tracking-wide">Rated</p>
             </div>
-            <div className="w-px h-8 bg-divider" />
+            <div className="w-px h-8 bg-white/40" />
             <button className="text-center flex-1" onClick={() => showPeople('followers')}>
               <p className="font-serif font-bold text-lg">{stats?.follower_count ?? 0}</p>
               <p className="text-[10px] text-secondary-text uppercase font-semibold tracking-wide">Followers</p>
             </button>
-            <div className="w-px h-8 bg-divider" />
+            <div className="w-px h-8 bg-white/40" />
             <button className="text-center flex-1" onClick={() => showPeople('following')}>
               <p className="font-serif font-bold text-lg">{stats?.following_count ?? 0}</p>
               <p className="text-[10px] text-secondary-text uppercase font-semibold tracking-wide">Following</p>
             </button>
             {isOwnProfile && (
               <>
-                <div className="w-px h-8 bg-divider" />
+                <div className="w-px h-8 bg-white/40" />
                 <div className="text-center flex-1">
                   <p className="font-serif font-bold text-lg">{stats?.wishlist_count ?? 0}</p>
                   <p className="text-[10px] text-secondary-text uppercase font-semibold tracking-wide">Saved</p>
@@ -399,7 +402,7 @@ export default function Profile() {
 
           {/* Streak */}
           {isOwnProfile && (
-            <div className="flex items-center gap-2 mt-4">
+            <div className="flex items-center gap-2 mt-4 glass-pill rounded-full px-4 py-2 w-fit">
               <span className="text-lg">🔥</span>
               <span className="text-sm font-semibold text-primary-text">
                 {profileUser?.streak_weeks || 0} week streak
@@ -419,9 +422,9 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="mt-6 border-b border-divider">
-            <div className="flex">
+          {/* Tabs — glass pills */}
+          <div className="mt-6">
+            <div className="flex gap-2">
               {TABS.filter((t) => isOwnProfile || t.key === 'ratings').map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.key;
@@ -432,17 +435,17 @@ export default function Profile() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-vouch border-b-2 ${
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-fluid ${
                       isActive
-                        ? 'text-terracotta border-terracotta'
-                        : 'text-text-muted border-transparent hover:text-charcoal'
+                        ? 'bg-charcoal text-cream shadow-[0_2px_10px_rgba(26,23,20,0.15)]'
+                        : 'glass-pill text-text-muted hover:text-charcoal'
                     }`}
                   >
                     <Icon size={14} />
                     {tab.label}
                     {count > 0 && (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                        isActive ? 'bg-terracotta/10 text-terracotta' : 'bg-cream-deep text-text-muted'
+                        isActive ? 'bg-white/20 text-cream' : 'bg-white/50 text-text-muted'
                       }`}>
                         {count}
                       </span>
@@ -459,8 +462,8 @@ export default function Profile() {
             {activeTab === 'ratings' && (
               <div>
                 {ratings.length === 0 ? (
-                  <div className="py-12 text-center bg-surface rounded-xl border border-divider">
-                    <Star size={28} className="mx-auto text-secondary-text mb-2" />
+                  <div className="py-12 text-center glass rounded-2xl">
+                    <Star size={28} className="mx-auto text-stone mb-2" />
                     <p className="text-sm text-secondary-text">
                       {isOwnProfile ? 'No ratings yet — go explore!' : 'No ratings yet'}
                     </p>
@@ -488,8 +491,8 @@ export default function Profile() {
             {activeTab === 'wishlist' && isOwnProfile && (
               <div>
                 {wishlistItems.length === 0 ? (
-                  <div className="py-12 text-center bg-surface rounded-xl border border-divider">
-                    <Bookmark size={28} className="mx-auto text-secondary-text mb-2" />
+                  <div className="py-12 text-center glass rounded-2xl">
+                    <Bookmark size={28} className="mx-auto text-stone mb-2" />
                     <p className="text-sm text-secondary-text">Save experiences you want to try</p>
                     <Button variant="ghost" size="sm" className="mt-3" onClick={() => navigate('/search')}>
                       Discover places
@@ -511,8 +514,8 @@ export default function Profile() {
 
             {/* Lists tab */}
             {activeTab === 'lists' && isOwnProfile && (
-              <div className="py-12 text-center bg-surface rounded-xl border border-divider">
-                <Users size={28} className="mx-auto text-secondary-text mb-2" />
+              <div className="py-12 text-center glass rounded-2xl">
+                <Users size={28} className="mx-auto text-stone mb-2" />
                 <p className="text-sm text-secondary-text">No lists yet</p>
                 <Button variant="ghost" size="sm" className="mt-3">Create your first list</Button>
               </div>

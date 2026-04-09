@@ -10,15 +10,13 @@ const ICONS = {
 };
 
 /**
- * BottomNav — 4-tab persistent bottom navigation bar.
- * Spec: page 2 — "persistent bottom navigation bar"
- * Tabs: Explore, Search, Map, Profile
+ * BottomNav — Liquid glass mobile bottom navigation.
  */
 export default function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-cream/95 backdrop-blur-md border-t border-stone-light z-50 lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden glass-solid border-t-0 rounded-t-2xl">
       <div className="max-w-lg mx-auto flex items-center justify-around h-14">
         {NAV_ITEMS.map(({ key, label, path }) => {
           const Icon = ICONS[key];
@@ -30,11 +28,13 @@ export default function BottomNav() {
               to={path}
               className="flex flex-col items-center gap-0.5 py-1 px-3 min-w-[56px]"
             >
-              <Icon
-                size={22}
-                className={isActive ? 'text-terracotta' : 'text-text-muted'}
-                strokeWidth={isActive ? 2.2 : 1.8}
-              />
+              <div className={`p-1.5 rounded-xl transition-fluid ${isActive ? 'glass-nav-active' : ''}`}>
+                <Icon
+                  size={20}
+                  className={isActive ? 'text-terracotta' : 'text-text-muted'}
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                />
+              </div>
               <span
                 className={`text-[10px] font-semibold ${isActive ? 'text-terracotta' : 'text-text-muted'}`}
               >

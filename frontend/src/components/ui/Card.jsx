@@ -1,13 +1,12 @@
 import PropTypes from 'prop-types';
 
 /**
- * Card — Base card with off-white surface (#F5F5F3) and subtle border.
- * Spec: page 5 — generous whitespace, no heavy borders or shadows.
+ * Card — Liquid glass surface with translucent blur and soft glow.
  */
 export default function Card({ children, className = '', onClick }) {
   return (
     <div
-      className={`bg-warm-white border border-stone-light rounded-xl p-4 ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99] transition-vouch' : ''} ${className}`}
+      className={`glass rounded-2xl p-4 ${onClick ? 'cursor-pointer glass-hover active:scale-[0.98]' : ''} ${className}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
