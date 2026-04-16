@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Search as SearchIcon, X as XIcon, MapPin, Loader2 } from 'lucide-react';
 import ChipStrip from '../components/ui/ChipStrip';
-import VouchScore from '../components/ui/VouchScore';
-import CategoryTag from '../components/ui/CategoryTag';
 import { CATEGORIES, COLORS } from '../lib/constants';
 import { api } from '../lib/api';
 
@@ -28,11 +27,11 @@ function createIcon(color, size = 28) {
 }
 
 const SCORE_COLORS = {
-  high: COLORS.sage,          // 9-10
-  good: COLORS.amber,         // 7-8
-  mid: COLORS.stone,          // 5-6
-  low: COLORS.terracotta,     // 0-4
-  none: '#9B9B9B',            // unrated
+  high: COLORS.sage,
+  good: COLORS.amber,
+  mid: COLORS.stone,
+  low: COLORS.terracotta,
+  none: '#9B9B9B',
 };
 
 function iconForScore(avg) {
@@ -51,7 +50,8 @@ const LAYERS = [
   { key: 'wishlist', label: 'Wishlist' },
 ];
 
-// ── Center map on pins ─────────────────────────────────────────
+// ── Map controllers ────────────────────────────────────────────
+/** Fit bounds to all visible pins (only when no localized area is active). */
 function FitBounds({ pins }) {
   const map = useMap();
   useEffect(() => {
@@ -60,6 +60,18 @@ function FitBounds({ pins }) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
     }
   }, [pins, map]);
+  return null;
+}
+
+/** Pan + zoom to a specific area (for when user searches "Soho"). */
+function PanToArea({ area }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!area) return;
+    // Roughly: 5km → zoom 13, 1km → zoom 16. Inverse-log feel.
+    const zoom = Math.max(13, Math.min(17, Math.round(16 - Math.log2(area.radius_km))));
+    map.flyTo([area.latitude, area.longitude], zoom, { duration: 0.8 });
+  }, [area, map]);
   return null;
 }
 
@@ -95,6 +107,7 @@ function NeighborhoodPanel({ neighborhoods, onSelect }) {
 // ── Main map component ─────────────────────────────────────────
 export default function MapPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeLayer, setActiveLayer] = useState('all');
   const [pins, setPins] = useState([]);
@@ -102,15 +115,40 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
 
+  // Localized area: { label, latitude, longitude, radius_km, source, experience_count }
+  const [area, setArea] = useState(null);
+  const [areaInput, setAreaInput] = useState('');
+  const [areaSearching, setAreaSearching] = useState(false);
+  const [areaError, setAreaError] = useState('');
+
   // Default center: Manhattan, NYC
   const defaultCenter = [40.7580, -73.9855];
 
+  // ── Restore area from URL on mount ───────────────────────────
+  const initialNear = searchParams.get('near');
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (initialNear) {
+      setAreaInput(initialNear);
+      doLocate(initialNear, { skipUrlUpdate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Loaders ──────────────────────────────────────────────────
   const loadPins = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
       if (selectedCategory) params.category = selectedCategory;
       if (activeLayer !== 'all') params.layer = activeLayer;
+      if (area) {
+        params.near_lat = area.latitude;
+        params.near_lng = area.longitude;
+        params.radius_km = area.radius_km;
+      }
       const data = await api.map.getPins(params);
       setPins(data || []);
     } catch {
@@ -118,7 +156,7 @@ export default function MapPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, activeLayer]);
+  }, [selectedCategory, activeLayer, area]);
 
   const loadNeighborhoods = useCallback(async () => {
     try {
@@ -129,10 +167,47 @@ export default function MapPage() {
     }
   }, [selectedCategory]);
 
-  useEffect(() => {
-    loadPins();
-    loadNeighborhoods();
-  }, [loadPins, loadNeighborhoods]);
+  useEffect(() => { loadPins(); }, [loadPins]);
+  useEffect(() => { loadNeighborhoods(); }, [loadNeighborhoods]);
+
+  // ── Locate (search-bar + neighborhood-panel both use this) ──
+  const doLocate = useCallback(
+    async (query, opts = {}) => {
+      const q = (query || '').trim();
+      if (!q) return;
+      setAreaSearching(true);
+      setAreaError('');
+      try {
+        const result = await api.map.locate(q);
+        setArea(result);
+        setAreaInput(result.label);
+        if (!opts.skipUrlUpdate) {
+          const next = new URLSearchParams(searchParams);
+          next.set('near', q);
+          setSearchParams(next, { replace: true });
+        }
+      } catch (err) {
+        setAreaError(err.message || `Could not find "${q}"`);
+        setArea(null);
+      } finally {
+        setAreaSearching(false);
+      }
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const clearArea = () => {
+    setArea(null);
+    setAreaInput('');
+    setAreaError('');
+    const next = new URLSearchParams(searchParams);
+    next.delete('near');
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleAreaKeyDown = (e) => {
+    if (e.key === 'Enter') doLocate(areaInput);
+  };
 
   const handleCategoryChange = (cat) => {
     setSelectedCategory(cat === selectedCategory ? null : cat);
@@ -141,8 +216,55 @@ export default function MapPage() {
   return (
     <div className="pb-20 lg:pb-0 h-[100dvh] flex flex-col">
 
+      {/* Location search bar — the main new piece */}
+      <div className="px-4 lg:px-8 pt-3 pb-2">
+        <div className="glass-input rounded-full px-4 py-2.5 flex items-center gap-2 max-w-2xl">
+          {areaSearching ? (
+            <Loader2 className="w-4 h-4 text-terracotta animate-spin shrink-0" />
+          ) : (
+            <SearchIcon className="w-4 h-4 text-text-muted shrink-0" />
+          )}
+          <input
+            type="text"
+            value={areaInput}
+            onChange={(e) => setAreaInput(e.target.value)}
+            onKeyDown={handleAreaKeyDown}
+            placeholder="Where to explore? (Soho, Williamsburg, Lower East Side…)"
+            className="flex-1 bg-transparent outline-none text-sm text-charcoal placeholder:text-text-muted"
+          />
+          {area ? (
+            <button
+              onClick={clearArea}
+              title="Show all places"
+              className="text-text-muted hover:text-charcoal text-xs flex items-center gap-1"
+            >
+              <XIcon className="w-3.5 h-3.5" /> Clear
+            </button>
+          ) : areaInput ? (
+            <button
+              onClick={() => doLocate(areaInput)}
+              className="text-terracotta font-semibold text-xs"
+            >
+              Go
+            </button>
+          ) : null}
+        </div>
+        {area && (
+          <div className="mt-1.5 ml-1 flex items-center gap-2 text-[11px] text-text-muted">
+            <MapPin className="w-3 h-3 text-terracotta" />
+            <span>
+              Near <strong className="text-charcoal">{area.label}</strong> · {area.radius_km} km radius · {area.experience_count} places nearby
+              {area.source === 'geocode' && ' · geocoded'}
+            </span>
+          </div>
+        )}
+        {areaError && (
+          <div className="mt-1.5 ml-1 text-[11px] text-red-500">{areaError}</div>
+        )}
+      </div>
+
       {/* Category filter */}
-      <div className="px-4 lg:px-8 py-2">
+      <div className="px-4 lg:px-8 py-1">
         <ChipStrip
           chips={CATEGORIES}
           selected={selectedCategory}
@@ -166,7 +288,6 @@ export default function MapPage() {
           </button>
         ))}
 
-        {/* Neighborhood toggle */}
         <button
           onClick={() => setShowPanel((s) => !s)}
           className={`text-xs px-3 py-1.5 rounded-full font-medium transition-vouch ml-auto ${
@@ -187,19 +308,25 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Neighborhood panel overlay */}
+        {/* Neighborhood panel — clicks now route through doLocate */}
         {showPanel && (
           <div className="absolute top-3 right-3 z-[1000] w-64">
-            <NeighborhoodPanel neighborhoods={neighborhoods} onSelect={(name) => {
-              // Filter by neighborhood — for now just close panel
-              setShowPanel(false);
-            }} />
+            <NeighborhoodPanel
+              neighborhoods={neighborhoods}
+              onSelect={(name) => {
+                setShowPanel(false);
+                doLocate(name);
+              }}
+            />
           </div>
         )}
 
         {/* Pin count badge */}
         <div className="absolute top-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-full px-3 py-1 shadow-sm border border-stone-light">
-          <span className="text-xs font-semibold text-primary-text">{pins.length} places</span>
+          <span className="text-xs font-semibold text-primary-text">
+            {pins.length} {pins.length === 1 ? 'place' : 'places'}
+            {area ? ` near ${area.label}` : ''}
+          </span>
         </div>
 
         <MapContainer
@@ -213,7 +340,10 @@ export default function MapPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {pins.length > 0 && <FitBounds pins={pins} />}
+          {/* When localized, prefer flying to the area; otherwise auto-fit pins. */}
+          {area
+            ? <PanToArea area={area} />
+            : pins.length > 0 && <FitBounds pins={pins} />}
 
           {pins.map((pin) => (
             <Marker
@@ -223,7 +353,6 @@ export default function MapPage() {
             >
               <Popup>
                 <div className="min-w-[200px]">
-                  {/* Cover photo */}
                   {pin.cover_photo_url && (
                     <img
                       src={pin.cover_photo_url}
@@ -278,6 +407,22 @@ export default function MapPage() {
             </Marker>
           ))}
         </MapContainer>
+
+        {/* Empty state for localized search with no pins */}
+        {!loading && area && pins.length === 0 && (
+          <div className="absolute inset-x-0 bottom-12 z-[1000] flex justify-center pointer-events-none">
+            <div className="bg-warm-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-lg border border-stone-light text-center max-w-xs pointer-events-auto">
+              <p className="text-sm font-semibold text-charcoal">No vouches near {area.label} yet</p>
+              <p className="text-xs text-text-muted mt-1">Be the first — search for a place and rate it.</p>
+              <button
+                onClick={() => navigate('/search')}
+                className="mt-2 inline-block bg-charcoal text-cream rounded-full px-4 py-1.5 text-xs font-semibold hover:bg-terracotta transition-vouch"
+              >
+                Discover places
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Legend */}
         <div className="absolute bottom-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-sm border border-stone-light">

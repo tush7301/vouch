@@ -127,6 +127,11 @@ export const api = {
       const qs = new URLSearchParams();
       if (params.category) qs.set('category', params.category);
       if (params.layer) qs.set('layer', params.layer);
+      if (params.near_lat !== undefined && params.near_lat !== null) {
+        qs.set('near_lat', params.near_lat);
+        qs.set('near_lng', params.near_lng);
+        if (params.radius_km) qs.set('radius_km', params.radius_km);
+      }
       const s = qs.toString();
       return request(`/map/pins${s ? `?${s}` : ''}`);
     },
@@ -134,5 +139,7 @@ export const api = {
       const qs = category ? `?category=${encodeURIComponent(category)}` : '';
       return request(`/map/neighborhoods${qs}`);
     },
+    /** Resolve a free-text area (e.g. "Soho") to lat/lng + radius. */
+    locate: (query) => request(`/map/locate?query=${encodeURIComponent(query)}`),
   },
 };

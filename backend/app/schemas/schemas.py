@@ -277,6 +277,16 @@ class NeighborhoodOut(BaseModel):
     avg_score: float
 
 
+class LocateResult(BaseModel):
+    """Resolved location for the map's "explore near X" feature."""
+    label: str                  # human-readable (e.g. "SoHo, Manhattan, NY")
+    latitude: float
+    longitude: float
+    radius_km: float            # suggested radius for the area
+    source: str                 # "db" | "geocode" — useful for debugging/UX
+    experience_count: int = 0   # how many existing experiences fell in the area
+
+
 # ---------- Misc ----------
 class HealthCheck(BaseModel):
     status: str = "ok"
