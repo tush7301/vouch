@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_user
-from app.schemas.schemas import UserOut, UserUpdate, ProfileStatsOut, ProfileRatingOut
+from app.schemas.schemas import UserOut, UserUpdate, ProfileStatsOut, ProfileRatingOut, FollowUserOut
 from app.models.user import User
 from app.models.rating import Rating
 from app.models.experience import Experience
@@ -14,10 +18,110 @@ from app.models.wishlist import Wishlist
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+# ── Tastemaker schemas ──
+class TastemakerOut(BaseModel):
+    id: str
+    username: str
+    display_name: str
+    avatar_url: str
+    tastemaker_specialty: str
+    tastemaker_blurb: str
+    follower_count: int
+    rating_count: int
+    is_following: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class TastemakerPromotePayload(BaseModel):
+    username: str
+    specialty: str
+    blurb: str
+    secret: str
+
+
 @router.get("/me", response_model=UserOut)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """Get the currently authenticated user."""
     return current_user
+
+
+# IMPORTANT: must be registered BEFORE /{user_id} or FastAPI will route
+# `/users/tastemakers` to get_user(user_id="tastemakers").
+@router.get("/tastemakers", response_model=List[TastemakerOut])
+def list_tastemakers(
+    limit: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List curated tastemaker accounts. Surfaced to new users to solve cold-start —
+    even with 0 friends, you have high-signal people to follow from day 1.
+    Sorted by follower count desc, then rating count desc.
+    """
+    rows = (
+        db.query(
+            User,
+            func.count(func.distinct(Follow.id)).label("followers"),
+            func.count(func.distinct(Rating.id)).label("ratings"),
+        )
+        .outerjoin(Follow, Follow.following_id == User.id)
+        .outerjoin(Rating, Rating.user_id == User.id)
+        .filter(User.is_tastemaker == True, User.is_active == True)
+        .group_by(User.id)
+        .order_by(func.count(func.distinct(Follow.id)).desc(), func.count(func.distinct(Rating.id)).desc())
+        .limit(limit)
+        .all()
+    )
+    if not rows:
+        return []
+
+    # Bulk follow-state lookup for current user
+    tm_ids = [u.id for u, _, _ in rows]
+    my_following = {
+        str(f.following_id)
+        for f in db.query(Follow)
+        .filter(Follow.follower_id == current_user.id, Follow.following_id.in_(tm_ids))
+        .all()
+    }
+
+    return [
+        TastemakerOut(
+            id=str(u.id),
+            username=u.username,
+            display_name=u.display_name,
+            avatar_url=u.avatar_url or "",
+            tastemaker_specialty=u.tastemaker_specialty or "",
+            tastemaker_blurb=u.tastemaker_blurb or "",
+            follower_count=int(followers or 0),
+            rating_count=int(ratings or 0),
+            is_following=str(u.id) in my_following,
+        )
+        for u, followers, ratings in rows
+    ]
+
+
+@router.post("/admin/promote-tastemaker", response_model=UserOut)
+def promote_tastemaker(payload: TastemakerPromotePayload, db: Session = Depends(get_db)):
+    """
+    Promote a user to tastemaker status. Gated by ADMIN_SECRET env var.
+    One-shot endpoint used by the seed script.
+    """
+    expected = os.getenv("ADMIN_SECRET", "")
+    if not expected or payload.secret != expected:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    user = db.query(User).filter(User.username == payload.username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{payload.username}' not found")
+
+    user.is_tastemaker = True
+    user.tastemaker_specialty = payload.specialty[:100]
+    user.tastemaker_blurb = payload.blurb[:300]
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.get("/{user_id}", response_model=UserOut)

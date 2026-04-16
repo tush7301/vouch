@@ -48,6 +48,7 @@ export const api = {
     getStats: (userId) => request(`/users/${userId}/stats`),
     getRatings: (userId) => request(`/users/${userId}/ratings`),
     getRelationship: (userId) => request(`/users/${userId}/relationship`),
+    getTastemakers: (limit = 20) => request(`/users/tastemakers?limit=${limit}`),
   },
 
   // ===== TASTE MATCH =====

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search as SearchIcon, Users, Sparkles, Loader2, UserPlus, UserCheck } from 'lucide-react';
+import { Search as SearchIcon, Users, Sparkles, Star, Loader2, UserPlus, UserCheck } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/ui/Avatar';
 import TasteMatchBadge from '../components/ui/TasteMatchBadge';
 import FriendBadge from '../components/ui/FriendBadge';
+import TastemakerBadge from '../components/ui/TastemakerBadge';
 
 /**
  * Find Friends page — Taste Twins (people with similar ratings) + user search.
@@ -18,6 +19,8 @@ export default function FindFriends() {
   const { user } = useAuth();
   const [twins, setTwins] = useState([]);
   const [twinsLoading, setTwinsLoading] = useState(true);
+  const [tastemakers, setTastemakers] = useState([]);
+  const [tastemakersLoading, setTastemakersLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -26,10 +29,12 @@ export default function FindFriends() {
   const [followState, setFollowState] = useState({});
   const [busyId, setBusyId] = useState(null);
 
-  // Load Taste Twins on mount
+  // Load Taste Twins + Tastemakers on mount
   useEffect(() => {
     let alive = true;
     setTwinsLoading(true);
+    setTastemakersLoading(true);
+
     api.tasteMatch.twins(12)
       .then((data) => {
         if (!alive) return;
@@ -42,6 +47,20 @@ export default function FindFriends() {
       })
       .catch(() => alive && setTwins([]))
       .finally(() => alive && setTwinsLoading(false));
+
+    api.users.getTastemakers(20)
+      .then((data) => {
+        if (!alive) return;
+        setTastemakers(data || []);
+        const initialState = {};
+        (data || []).forEach((t) => {
+          initialState[t.id] = { isFollowing: t.is_following, isMutual: false };
+        });
+        setFollowState((s) => ({ ...initialState, ...s })); // don't overwrite twin state
+      })
+      .catch(() => alive && setTastemakers([]))
+      .finally(() => alive && setTastemakersLoading(false));
+
     return () => { alive = false; };
   }, []);
 
@@ -158,6 +177,41 @@ export default function FindFriends() {
                   onFollow={() => handleFollow(u.id)}
                   onClick={() => navigate(`/profile/${u.id}`)}
                   busy={busyId === u.id}
+                  isTastemaker={u.is_tastemaker}
+                  specialty={u.tastemaker_specialty}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Tastemakers — curated accounts (cold-start unlock) */}
+      {!searched && (
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <SectionLabel icon={<Star className="w-3.5 h-3.5" fill="currentColor" />}>
+              Tastemakers to Follow
+            </SectionLabel>
+            <span className="text-[10px] text-text-muted uppercase tracking-wider">Vetted picks</span>
+          </div>
+          {tastemakersLoading ? (
+            <Spinner />
+          ) : tastemakers.length === 0 ? null : (
+            <div className="space-y-2">
+              {tastemakers.slice(0, 5).map((t) => (
+                <UserRow
+                  key={t.id}
+                  user={t}
+                  matchPct={null}
+                  overlap={0}
+                  state={followState[t.id]}
+                  onFollow={() => handleFollow(t.id)}
+                  onClick={() => navigate(`/profile/${t.id}`)}
+                  busy={busyId === t.id}
+                  isTastemaker={true}
+                  specialty={t.tastemaker_specialty}
+                  blurb={t.tastemaker_blurb}
                 />
               ))}
             </div>
@@ -201,6 +255,8 @@ export default function FindFriends() {
                 onFollow={() => handleFollow(t.id)}
                 onClick={() => navigate(`/profile/${t.id}`)}
                 busy={busyId === t.id}
+                isTastemaker={t.is_tastemaker}
+                specialty={t.tastemaker_specialty}
               />
             ))}
           </div>
@@ -212,7 +268,7 @@ export default function FindFriends() {
 
 // ── Subcomponents ──
 
-function UserRow({ user, matchPct, overlap, state, onFollow, onClick, busy }) {
+function UserRow({ user, matchPct, overlap, state, onFollow, onClick, busy, isTastemaker, specialty, blurb }) {
   const isFollowing = state?.isFollowing;
   const isMutual = state?.isMutual;
 
@@ -226,9 +282,18 @@ function UserRow({ user, matchPct, overlap, state, onFollow, onClick, busy }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-charcoal truncate">{user.display_name}</span>
+            <TastemakerBadge isTastemaker={isTastemaker} variant="icon" size="sm" specialty={specialty} />
             <FriendBadge isMutual={isMutual} isFollowing={isFollowing && !isMutual} size="sm" />
           </div>
           <div className="text-text-muted text-xs">@{user.username}</div>
+          {isTastemaker && specialty && (
+            <div className="mt-1.5">
+              <TastemakerBadge isTastemaker={true} specialty={specialty} size="sm" />
+            </div>
+          )}
+          {blurb && (
+            <p className="text-text-muted text-xs mt-1 line-clamp-2">{blurb}</p>
+          )}
           {matchPct !== null && matchPct !== undefined && (
             <div className="mt-1.5">
               <TasteMatchBadge pct={matchPct} overlap={overlap} size="sm" />

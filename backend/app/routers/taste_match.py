@@ -34,6 +34,8 @@ class TasteTwinOut(BaseModel):
     overlap_count: int
     is_following: bool
     is_mutual: bool
+    is_tastemaker: bool = False
+    tastemaker_specialty: str = ""
 
 
 class TasteMatchOut(BaseModel):
@@ -165,5 +167,7 @@ def taste_twins(
             overlap_count=overlap,
             is_following=is_following,
             is_mutual=is_mutual,
+            is_tastemaker=bool(u.is_tastemaker),
+            tastemaker_specialty=u.tastemaker_specialty or "",
         ))
     return out

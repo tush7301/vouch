@@ -23,6 +23,8 @@ class RelationshipOut(BaseModel):
     is_mutual: bool          # Both — true "Friend"
     follower_count: int      # their followers
     following_count: int     # who they follow
+    is_tastemaker: bool = False
+    tastemaker_specialty: str = ""
 
 
 @router.post("/{user_id}/follow", response_model=FollowOut, status_code=201)
@@ -154,4 +156,6 @@ def get_relationship(
         is_mutual=is_following and is_follower,
         follower_count=follower_count,
         following_count=following_count,
+        is_tastemaker=bool(target.is_tastemaker),
+        tastemaker_specialty=target.tastemaker_specialty or "",
     )

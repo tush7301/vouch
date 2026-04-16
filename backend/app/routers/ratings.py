@@ -131,6 +131,8 @@ def get_ratings_for_experience(experience_id: str, db: Session = Depends(get_db)
             user_display_name=u.display_name,
             user_avatar_url=u.avatar_url or "",
             user_username=u.username,
+            user_is_tastemaker=bool(u.is_tastemaker),
+            user_tastemaker_specialty=u.tastemaker_specialty or "",
         )
         for r, u in rows
     ]

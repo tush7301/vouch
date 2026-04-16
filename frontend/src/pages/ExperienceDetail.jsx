@@ -7,6 +7,7 @@ import CategoryTag from '../components/ui/CategoryTag';
 import Avatar from '../components/ui/Avatar';
 import TagPill from '../components/ui/TagPill';
 import Card from '../components/ui/Card';
+import TastemakerBadge from '../components/ui/TastemakerBadge';
 import { api } from '../lib/api';
 
 export default function ExperienceDetail() {
@@ -232,11 +233,22 @@ export default function ExperienceDetail() {
                     <Avatar name={r.user_display_name || r.user_id} size="sm" />
                     <div>
                       {r.user_display_name && (
-                        <div className="text-sm font-semibold text-primary-text">{r.user_display_name}</div>
+                        <div className="text-sm font-semibold text-primary-text flex items-center gap-1.5">
+                          {r.user_display_name}
+                          <TastemakerBadge
+                            isTastemaker={r.user_is_tastemaker}
+                            specialty={r.user_tastemaker_specialty}
+                            variant="icon"
+                            size="sm"
+                          />
+                        </div>
                       )}
                       <div className="text-xs text-secondary-text flex items-center gap-1">
                         <Clock size={12} />
                         {new Date(r.created_at).toLocaleDateString()}
+                        {r.user_is_tastemaker && r.user_tastemaker_specialty && (
+                          <span className="ml-1 text-amber font-medium">· {r.user_tastemaker_specialty}</span>
+                        )}
                       </div>
                     </div>
                   </div>
