@@ -28,6 +28,10 @@ services:
         sync: false
       - key: TICKETMASTER_API_KEY
         sync: false
+      # Gate for /users/admin/promote-tastemaker. Used by populate_tastemakers.py
+      # during seeding only. Rotate from the Render dashboard after seeding.
+      - key: ADMIN_SECRET
+        value: vouch-tastemaker-seed-2026-q2-internal
 
   # --- Frontend Static Site ---
   - type: web
