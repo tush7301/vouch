@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Compass, Search, Map, User, LogOut, Settings } from 'lucide-react';
+import { Compass, Search, Map, User, Users, LogOut, Settings } from 'lucide-react';
 import { NAV_ITEMS } from '../../lib/constants';
 import { useAuth } from '../../context/AuthContext';
 import VouchLogo from '../ui/VouchLogo';
@@ -8,6 +8,7 @@ const ICONS = {
   feed: Compass,
   search: Search,
   map: Map,
+  friends: Users,
   profile: User,
 };
 

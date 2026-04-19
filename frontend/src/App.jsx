@@ -6,6 +6,7 @@ import SideNav from './components/layout/SideNav';
 import Feed from './pages/Feed';
 import Search from './pages/Search';
 import MapPage from './pages/Map';
+import FindFriends from './pages/FindFriends';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
@@ -43,6 +44,7 @@ export default function App() {
                       <Route path="/" element={<Feed />} />
                       <Route path="/search" element={<Search />} />
                       <Route path="/map" element={<MapPage />} />
+                      <Route path="/friends" element={<FindFriends />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/:userId" element={<Profile />} />
                       <Route path="/settings" element={<SettingsPage />} />

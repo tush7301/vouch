@@ -31,6 +31,12 @@ class User(Base):
     streak_weeks = Column(String(10), default="0")
     badge_ids = Column(Text, default="")  # comma-separated badge ids
 
+    # Tastemaker — curated/verified accounts that solve cold-start by giving
+    # new users high-signal people to follow from day 1.
+    is_tastemaker = Column(Boolean, default=False, nullable=False, index=True)
+    tastemaker_specialty = Column(String(100), default="")  # e.g. "Food Critic", "Nightlife"
+    tastemaker_blurb = Column(String(300), default="")      # short bio for tastemaker card
+
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

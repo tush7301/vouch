@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.rating import Rating
 from app.models.wishlist import Wishlist
 from app.models.follow import Follow
-from app.routers import auth, users, experiences, ratings, feed, friends, wishlist, map as map_router
+from app.routers import auth, users, experiences, ratings, feed, friends, wishlist, map as map_router, taste_match
 import app.models  # noqa: F401 — ensure all models are registered before queries
 
 app = FastAPI(
@@ -47,6 +47,7 @@ app.include_router(ratings.router, prefix=settings.API_V1_STR)
 app.include_router(feed.router, prefix=settings.API_V1_STR)
 app.include_router(wishlist.router, prefix=settings.API_V1_STR)
 app.include_router(map_router.router, prefix=settings.API_V1_STR)
+app.include_router(taste_match.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", response_model=HealthCheck, tags=["health"])

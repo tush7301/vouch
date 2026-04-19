@@ -32,6 +32,9 @@ class UserOut(UserBase):
     streak_weeks: str
     is_active: bool
     created_at: datetime
+    is_tastemaker: bool = False
+    tastemaker_specialty: Optional[str] = ""
+    tastemaker_blurb: Optional[str] = ""
 
     class Config:
         from_attributes = True
@@ -112,6 +115,8 @@ class EnrichedRatingOut(BaseModel):
     user_display_name: str
     user_avatar_url: str
     user_username: str
+    user_is_tastemaker: bool = False
+    user_tastemaker_specialty: Optional[str] = ""
 
     class Config:
         from_attributes = True
@@ -165,6 +170,8 @@ class FollowUserOut(BaseModel):
     username: str
     display_name: str
     avatar_url: str
+    is_tastemaker: bool = False
+    tastemaker_specialty: Optional[str] = ""
 
     class Config:
         from_attributes = True

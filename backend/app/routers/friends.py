@@ -3,6 +3,7 @@ Follow/Friends router — follow/unfollow, list followers/following, search user
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -12,6 +13,18 @@ from app.models.user import User
 from app.models.follow import Follow
 
 router = APIRouter(prefix="/users", tags=["friends"])
+
+
+class RelationshipOut(BaseModel):
+    user_id: str
+    is_self: bool
+    is_following: bool       # I follow them
+    is_follower: bool        # They follow me
+    is_mutual: bool          # Both — true "Friend"
+    follower_count: int      # their followers
+    following_count: int     # who they follow
+    is_tastemaker: bool = False
+    tastemaker_specialty: str = ""
 
 
 @router.post("/{user_id}/follow", response_model=FollowOut, status_code=201)
@@ -97,4 +110,52 @@ def search_users(
         )
         .limit(20)
         .all()
+    )
+
+
+@router.get("/{user_id}/relationship", response_model=RelationshipOut)
+def get_relationship(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the relationship between the current user and a target user.
+    Returns is_following, is_follower, is_mutual (true "Friend") and counts.
+    """
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    is_self = str(current_user.id) == user_id
+    is_following = False
+    is_follower = False
+
+    if not is_self:
+        is_following = (
+            db.query(Follow)
+            .filter(Follow.follower_id == current_user.id, Follow.following_id == user_id)
+            .first()
+            is not None
+        )
+        is_follower = (
+            db.query(Follow)
+            .filter(Follow.follower_id == user_id, Follow.following_id == current_user.id)
+            .first()
+            is not None
+        )
+
+    follower_count = db.query(Follow).filter(Follow.following_id == user_id).count()
+    following_count = db.query(Follow).filter(Follow.follower_id == user_id).count()
+
+    return RelationshipOut(
+        user_id=user_id,
+        is_self=is_self,
+        is_following=is_following,
+        is_follower=is_follower,
+        is_mutual=is_following and is_follower,
+        follower_count=follower_count,
+        following_count=following_count,
+        is_tastemaker=bool(target.is_tastemaker),
+        tastemaker_specialty=target.tastemaker_specialty or "",
     )

@@ -10,6 +10,9 @@ import CategoryTag from '../components/ui/CategoryTag';
 import SectionLabel from '../components/ui/SectionLabel';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import FriendBadge from '../components/ui/FriendBadge';
+import TasteMatchBadge from '../components/ui/TasteMatchBadge';
+import TastemakerBadge from '../components/ui/TastemakerBadge';
 import { CATEGORIES, COLORS } from '../lib/constants';
 import { api } from '../lib/api';
 
@@ -204,6 +207,9 @@ export default function Profile() {
   const [showEdit, setShowEdit] = useState(false);
   const [peopleModal, setPeopleModal] = useState(null);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isMutual, setIsMutual] = useState(false);
+  const [isFollower, setIsFollower] = useState(false);
+  const [tasteMatch, setTasteMatch] = useState(null); // { match_percent, overlap_count }
 
   const loadProfile = useCallback(async () => {
     if (!profileUserId) return;
@@ -239,10 +245,21 @@ export default function Profile() {
   }, [profileUserId, isOwnProfile, user]);
 
   useEffect(() => {
-    if (!isOwnProfile && user?.id) {
-      api.users.getFollowing(user.id).then((following) => {
-        setIsFollowing(following.some((f) => String(f.id) === String(profileUserId)));
-      }).catch(() => {});
+    if (!isOwnProfile && user?.id && profileUserId) {
+      // Get relationship + taste match in parallel
+      Promise.all([
+        api.users.getRelationship(profileUserId).catch(() => null),
+        api.tasteMatch.with(profileUserId).catch(() => null),
+      ]).then(([rel, match]) => {
+        if (rel) {
+          setIsFollowing(rel.is_following);
+          setIsMutual(rel.is_mutual);
+          setIsFollower(rel.is_follower);
+        }
+        if (match) {
+          setTasteMatch(match);
+        }
+      });
     }
   }, [isOwnProfile, user?.id, profileUserId]);
 
@@ -264,10 +281,14 @@ export default function Profile() {
       if (isFollowing) {
         await api.users.unfollow(profileUserId);
         setIsFollowing(false);
+        setIsMutual(false);
         setStats((s) => s ? { ...s, follower_count: Math.max(0, s.follower_count - 1) } : s);
       } else {
         await api.users.follow(profileUserId);
         setIsFollowing(true);
+        // Re-check relationship — if they already follow us, this becomes mutual
+        const rel = await api.users.getRelationship(profileUserId).catch(() => null);
+        if (rel) setIsMutual(rel.is_mutual);
         setStats((s) => s ? { ...s, follower_count: s.follower_count + 1 } : s);
       }
     } catch (err) {
@@ -328,8 +349,14 @@ export default function Profile() {
             <div className="flex items-center gap-4">
               <Avatar name={profileUser?.display_name || 'User'} src={profileUser?.avatar_url} size="lg" />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-serif text-xl font-bold truncate">{profileUser?.display_name}</h2>
+                  <TastemakerBadge
+                    isTastemaker={profileUser?.is_tastemaker}
+                    variant="icon"
+                    size="md"
+                    specialty={profileUser?.tastemaker_specialty}
+                  />
                   {isOwnProfile && (
                     <button
                       onClick={() => setShowEdit(true)}
@@ -338,10 +365,41 @@ export default function Profile() {
                       <Edit3 size={14} />
                     </button>
                   )}
+                  {!isOwnProfile && (
+                    <FriendBadge
+                      isMutual={isMutual}
+                      isFollowing={isFollowing && !isMutual}
+                      isFollower={isFollower && !isFollowing}
+                      size="sm"
+                    />
+                  )}
                 </div>
                 <p className="text-sm text-terracotta font-medium">@{profileUser?.username}</p>
-                {profileUser?.bio && (
+                {profileUser?.is_tastemaker && (
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    <TastemakerBadge
+                      isTastemaker={true}
+                      specialty={profileUser?.tastemaker_specialty}
+                      size="sm"
+                    />
+                  </div>
+                )}
+                {profileUser?.tastemaker_blurb && (
+                  <p className="text-sm text-secondary-text mt-1 line-clamp-2 italic">
+                    "{profileUser.tastemaker_blurb}"
+                  </p>
+                )}
+                {profileUser?.bio && !profileUser?.tastemaker_blurb && (
                   <p className="text-sm text-secondary-text mt-0.5 line-clamp-2">{profileUser.bio}</p>
+                )}
+                {!isOwnProfile && tasteMatch && (
+                  <div className="mt-2">
+                    <TasteMatchBadge
+                      pct={tasteMatch.match_percent}
+                      overlap={tasteMatch.overlap_count}
+                      size="sm"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -367,7 +425,7 @@ export default function Profile() {
                   className="w-full"
                   onClick={handleFollow}
                 >
-                  {isFollowing ? 'Following' : 'Follow'}
+                  {isMutual ? 'Friends ✓' : isFollowing ? 'Following' : isFollower ? 'Follow back' : 'Follow'}
                 </Button>
               </div>
             )}

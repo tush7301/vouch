@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Compass, Search, Map, User } from 'lucide-react';
+import { Compass, Search, Map, User, Users } from 'lucide-react';
 import { NAV_ITEMS } from '../../lib/constants';
 
 const ICONS = {
   feed: Compass,
   search: Search,
   map: Map,
+  friends: Users,
   profile: User,
 };
 

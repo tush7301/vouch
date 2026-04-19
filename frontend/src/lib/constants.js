@@ -63,6 +63,7 @@ export const NAV_ITEMS = [
   { key: 'feed', label: 'Explore', path: '/' },
   { key: 'search', label: 'Search', path: '/search' },
   { key: 'map', label: 'Map', path: '/map' },
+  { key: 'friends', label: 'Friends', path: '/friends' },
   { key: 'profile', label: 'Profile', path: '/profile' },
 ];
 

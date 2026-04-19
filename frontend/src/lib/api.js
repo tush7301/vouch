@@ -47,6 +47,14 @@ export const api = {
     unfollow: (userId) => request(`/users/${userId}/follow`, { method: 'DELETE' }),
     getStats: (userId) => request(`/users/${userId}/stats`),
     getRatings: (userId) => request(`/users/${userId}/ratings`),
+    getRelationship: (userId) => request(`/users/${userId}/relationship`),
+    getTastemakers: (limit = 20) => request(`/users/tastemakers?limit=${limit}`),
+  },
+
+  // ===== TASTE MATCH =====
+  tasteMatch: {
+    twins: (limit = 10) => request(`/taste-match/twins?limit=${limit}`),
+    with: (userId) => request(`/taste-match/with/${userId}`),
   },
 
   // ===== EXPERIENCES =====
