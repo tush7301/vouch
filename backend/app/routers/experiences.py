@@ -103,13 +103,14 @@ async def search_external_places(
     q: str = Query(..., min_length=1),
     lat: Optional[float] = None,
     lng: Optional[float] = None,
+    radius: int = Query(50000, description="Search radius in metres (default 50 km)"),
 ):
     """
     Search Google Places API for venues.
     Returns normalised results (not yet saved to our DB).
     Frontend can call POST /experiences/ to import a selected result.
     """
-    results = await google_places.search_places(q, latitude=lat, longitude=lng)
+    results = await google_places.search_places(q, latitude=lat, longitude=lng, radius=radius)
     return {"results": results, "source": "google_places"}
 
 

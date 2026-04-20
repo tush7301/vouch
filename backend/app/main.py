@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.rating import Rating
 from app.models.wishlist import Wishlist
 from app.models.follow import Follow
-from app.routers import auth, users, experiences, ratings, feed, friends, wishlist, map as map_router, taste_match
+from app.routers import auth, users, experiences, ratings, feed, friends, wishlist, map as map_router, taste_match, lists as lists_router
 import app.models  # noqa: F401 — ensure all models are registered before queries
 
 app = FastAPI(
@@ -40,6 +40,9 @@ app.add_middleware(
 
 # Mount routers under /api/v1
 app.include_router(auth.router, prefix=settings.API_V1_STR)
+# Compatibility alias for clients that call /auth/* without /api/v1.
+# Keep these routes out of OpenAPI to avoid duplicate operation IDs.
+app.include_router(auth.router, include_in_schema=False)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 app.include_router(friends.router, prefix=settings.API_V1_STR)
 app.include_router(experiences.router, prefix=settings.API_V1_STR)
@@ -48,6 +51,7 @@ app.include_router(feed.router, prefix=settings.API_V1_STR)
 app.include_router(wishlist.router, prefix=settings.API_V1_STR)
 app.include_router(map_router.router, prefix=settings.API_V1_STR)
 app.include_router(taste_match.router, prefix=settings.API_V1_STR)
+app.include_router(lists_router.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", response_model=HealthCheck, tags=["health"])

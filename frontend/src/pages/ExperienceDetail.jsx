@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Star, Clock, Bookmark, PenLine } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Clock, Bookmark, PenLine, Sparkles, Flame } from 'lucide-react';
+import PhotoCarousel from '../components/ui/PhotoCarousel';
 import VouchScore from '../components/ui/VouchScore';
 import ScoreLabel from '../components/ui/ScoreLabel';
 import CategoryTag from '../components/ui/CategoryTag';
@@ -62,6 +63,114 @@ export default function ExperienceDetail() {
     return str.split(',').map((t) => t.trim()).filter(Boolean);
   };
 
+  // ── Review summary (aggregated highlights) ─────────────────────
+  const reviewSummary = (() => {
+    if (ratings.length === 0) return null;
+    const dims = [
+      { key: 'vibe', label: 'vibe', avg: parseFloat(avgVibe) || 0 },
+      { key: 'value', label: 'value', avg: parseFloat(avgValue) || 0 },
+      { key: 'experience', label: 'experience', avg: parseFloat(avgExp) || 0 },
+    ];
+    const top = dims.reduce((a, b) => (b.avg > a.avg ? b : a));
+    const positiveCount = ratings.filter((r) => r.overall_score >= 7).length;
+    const pct = Math.round((positiveCount / ratings.length) * 100);
+
+    // Collect descriptive adjectives that recur across reviews.
+    const ADJECTIVES = [
+      'great', 'amazing', 'incredible', 'delicious', 'cozy', 'lively', 'chill',
+      'elegant', 'authentic', 'fresh', 'friendly', 'quiet', 'busy', 'intimate',
+      'stylish', 'solid', 'excellent', 'perfect', 'warm', 'fun', 'vibey',
+      'legit', 'sneaky-good', 'thoughtful', 'consistent', 'underrated',
+    ];
+    const freq = {};
+    ratings.forEach((r) => {
+      const text = (r.review_text || '').toLowerCase();
+      ADJECTIVES.forEach((adj) => {
+        if (text.includes(adj)) freq[adj] = (freq[adj] || 0) + 1;
+      });
+    });
+    const topAdjs = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([w]) => w);
+
+    const adjPart = topAdjs.length
+      ? `Reviewers describe it as ${topAdjs.join(', ')}.`
+      : '';
+    const verdict = pct >= 80
+      ? 'It earns consistent praise'
+      : pct >= 50
+        ? 'Reception is generally warm'
+        : 'Reviews are mixed';
+
+    return {
+      headline: `${verdict} — the ${top.label} stands out (${top.avg}/10).`,
+      detail: adjPart,
+      pct,
+      count: ratings.length,
+    };
+  })();
+
+  // ── Must Tries — specific things reviewers recommend ordering/doing. ─
+  // Intentionally *not* from tags (those are too generic, e.g. "Date-Night").
+  // Pull concrete noun phrases from recommendation patterns in review text.
+  const mustTries = (() => {
+    if (ratings.length === 0) return [];
+    const items = new Map(); // key -> { label, count }
+
+    // Words that should NEVER be a must-try on their own. If a captured
+    // phrase is just these, skip it.
+    const STOP_PHRASES = new Set([
+      'there', 'early', 'late', 'here', 'it', 'them', 'that', 'this',
+      'right', 'in', 'out', 'up', 'on', 'off', 'a seat', 'a table',
+      'a drink', 'a reservation', 'ready', 'going', 'busy', 'home',
+    ]);
+
+    const addPhrase = (raw) => {
+      if (!raw) return;
+      let cleaned = raw.trim().replace(/\s+/g, ' ').replace(/[.,;!?]+$/, '');
+      // Trim trailing filler words that aren't part of the thing.
+      cleaned = cleaned.replace(/\s+(?:if|when|and|but|or|so|because|before|after)\s.*$/i, '');
+      cleaned = cleaned.trim();
+      if (cleaned.length < 3 || cleaned.length > 40) return;
+      if (STOP_PHRASES.has(cleaned.toLowerCase())) return;
+      // Must contain at least one noun-ish word (> 3 chars).
+      if (!/[a-z]{4,}/i.test(cleaned)) return;
+
+      const key = cleaned.toLowerCase();
+      const entry = items.get(key) || { label: cleaned, count: 0 };
+      entry.count += 1;
+      items.set(key, entry);
+    };
+
+    // Patterns that signal a specific recommended thing (menu item, room, ritual).
+    const PATTERNS = [
+      // "order the chef's tasting", "try the cocktails", "get the ribeye"
+      /\b(?:order|try|get|grab|sample|go for|ask for|have)\s+the\s+([a-z][a-z'’\s-]{2,40}?)(?=[.,;!?]|$)/gi,
+      // "don't sleep on the back room"
+      /\bdon'?t\s+sleep\s+on\s+the\s+([a-z][a-z'’\s-]{2,40}?)(?=[.,;!?]|$)/gi,
+      // "the ribeye is incredible", "the bar program is sneaky-good"
+      /\bthe\s+([a-z][a-z'’\s-]{2,40}?)\s+(?:is|are)\s+(?:great|amazing|incredible|legit|sneaky-good|perfect|excellent|the move|a standout|worth it|on point|dialed|unreal|top tier|a-tier)\b/gi,
+      // "X is the move" / "X is a must"
+      /\b([a-z][a-z'’\s-]{2,40}?)\s+is\s+(?:the move|a must|a standout|worth (?:it|the trip))\b/gi,
+      // "stay for the room transitions"
+      /\bstay\s+for\s+the\s+([a-z][a-z'’\s-]{2,40}?)(?=[.,;!?]|$)/gi,
+    ];
+
+    ratings.forEach((r) => {
+      const text = r.review_text || '';
+      PATTERNS.forEach((re) => {
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(text)) !== null) addPhrase(m[1]);
+      });
+    });
+
+    return Array.from(items.values())
+      .sort((a, b) => b.count - a.count || a.label.length - b.label.length)
+      .slice(0, 6);
+  })();
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -88,7 +197,7 @@ export default function ExperienceDetail() {
     <div className="pb-20 lg:pb-8">
       {/* Header bar */}
       <div className="sticky top-0 z-20 bg-cream/90 backdrop-blur-sm border-b border-stone-light">
-        <div className="max-w-4xl mx-auto px-4 lg:px-8 py-3 flex items-center justify-between">
+        <div className="max-w-[600px] mx-auto px-4 lg:px-8 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-1 text-charcoal hover:text-terracotta transition-vouch"
@@ -118,16 +227,16 @@ export default function ExperienceDetail() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 lg:px-8 py-6">
-        {/* Cover photo */}
-        {experience.cover_photo_url && (
-          <div className="rounded-xl overflow-hidden mb-6 aspect-[2/1]">
-            <img
-              src={experience.cover_photo_url}
-              alt={experience.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
+      <div className="max-w-[600px] mx-auto px-4 lg:px-8 py-6">
+        {/* Photo carousel — square, matches feed style */}
+        {(experience.cover_photo_url || experience.photo_urls) && (
+          <PhotoCarousel
+            coverUrl={experience.cover_photo_url}
+            photoUrlsStr={experience.photo_urls}
+            alt={experience.name}
+            rounded="rounded-2xl"
+            className="mb-6"
+          />
         )}
 
         {/* Title + score */}
@@ -198,6 +307,52 @@ export default function ExperienceDetail() {
               Based on {ratings.length} rating{ratings.length !== 1 ? 's' : ''}
             </div>
           </Card>
+        )}
+
+        {/* Review summary — aggregated highlights */}
+        {reviewSummary && (
+          <div className="mt-6">
+            <Card>
+              <h2 className="font-serif text-lg font-bold mb-2 flex items-center gap-2">
+                <Sparkles size={18} className="text-terracotta" />
+                Review Summary
+              </h2>
+              <p className="text-sm text-primary-text leading-relaxed">
+                {reviewSummary.headline}
+                {reviewSummary.detail && (
+                  <span className="text-secondary-text"> {reviewSummary.detail}</span>
+                )}
+              </p>
+              <div className="text-xs text-secondary-text mt-2">
+                {reviewSummary.pct}% positive · {reviewSummary.count} review{reviewSummary.count !== 1 ? 's' : ''}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Must Tries — things people recommend */}
+        {mustTries.length > 0 && (
+          <div className="mt-4">
+            <Card>
+              <h2 className="font-serif text-lg font-bold mb-3 flex items-center gap-2">
+                <Flame size={18} className="text-amber" />
+                Must Tries
+              </h2>
+              <ul className="space-y-1.5">
+                {mustTries.map((m) => (
+                  <li key={m.label} className="flex items-center justify-between text-sm">
+                    <span className="text-primary-text capitalize">{m.label}</span>
+                    <span className="text-[11px] text-secondary-text">
+                      {m.count}× mentioned
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-[11px] text-secondary-text mt-3">
+                Pulled from what reviewers specifically recommend ordering or doing here.
+              </div>
+            </Card>
+          </div>
         )}
 
         {/* Rate CTA button */}

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import VouchLogo from '../components/ui/VouchLogo';
 
 /**
@@ -8,29 +9,55 @@ import VouchLogo from '../components/ui/VouchLogo';
  */
 export default function Landing() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const revealRefs = useRef([]);
+  const observerRef = useRef(null);
 
-  // Scroll-reveal observer
+  // If user is already authenticated, skip the landing page entirely.
+  useEffect(() => {
+    if (isAuthenticated) navigate('/', { replace: true });
+  }, [isAuthenticated, navigate]);
+
+  const showEl = (el) => {
+    el.classList.add('opacity-100', 'translate-y-0');
+    el.classList.remove('opacity-0', 'translate-y-6');
+  };
+
+  // Scroll-reveal observer — set up once, observes elements as they register.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
           if (e.isIntersecting) {
-            e.target.classList.add('opacity-100', 'translate-y-0');
-            e.target.classList.remove('opacity-0', 'translate-y-6');
+            showEl(e.target);
             observer.unobserve(e.target);
           }
         });
       },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' },
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' },
     );
+    observerRef.current = observer;
     revealRefs.current.forEach((el) => el && observer.observe(el));
-    return () => observer.disconnect();
+
+    // Safety fallback: if IntersectionObserver misses anything (e.g. initial
+    // above-the-fold elements in some browsers), force-reveal after 1.2s.
+    const fallback = setTimeout(() => {
+      revealRefs.current.forEach((el) => el && showEl(el));
+    }, 1200);
+
+    return () => {
+      clearTimeout(fallback);
+      observer.disconnect();
+    };
   }, []);
 
-  const reveal = (el) => {
-    if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
-  };
+  // Stable callback ref: registers every element with the observer as it mounts.
+  const reveal = useCallback((el) => {
+    if (el && !revealRefs.current.includes(el)) {
+      revealRefs.current.push(el);
+      if (observerRef.current) observerRef.current.observe(el);
+    }
+  }, []);
 
   // Nav scroll effect
   const navRef = useRef(null);
@@ -55,12 +82,20 @@ export default function Landing() {
       >
         <div className="max-w-[1100px] mx-auto flex items-center justify-between">
           <VouchLogo size="sm" />
-          <button
-            onClick={() => navigate('/login')}
-            className="px-5 py-2.5 rounded-full bg-charcoal text-cream text-sm font-semibold hover:bg-terracotta transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
-          >
-            Sign Up
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/login', { state: { mode: 'login' } })}
+              className="px-4 py-2 rounded-full text-charcoal text-sm font-semibold hover:text-terracotta transition-all duration-300"
+            >
+              Log in
+            </button>
+            <button
+              onClick={() => navigate('/login', { state: { mode: 'register' } })}
+              className="px-5 py-2.5 rounded-full bg-charcoal text-cream text-sm font-semibold hover:bg-terracotta transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              Sign Up
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -91,10 +126,16 @@ export default function Landing() {
               <div ref={reveal} className="opacity-0 translate-y-6 transition-all duration-700 delay-300">
                 <div className="flex gap-2 max-w-[420px] flex-col sm:flex-row">
                   <button
-                    onClick={() => navigate('/login')}
+                    onClick={() => navigate('/login', { state: { mode: 'register' } })}
                     className="flex-1 px-6 py-3.5 rounded-full bg-charcoal text-cream font-semibold text-[0.92rem] hover:bg-terracotta transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
                   >
                     Sign Up
+                  </button>
+                  <button
+                    onClick={() => navigate('/login', { state: { mode: 'login' } })}
+                    className="flex-1 px-6 py-3.5 rounded-full border border-charcoal text-charcoal font-semibold text-[0.92rem] hover:bg-charcoal hover:text-cream transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+                  >
+                    Log in
                   </button>
                 </div>
                 <p className="text-[0.78rem] text-text-muted mt-2.5">
@@ -157,7 +198,7 @@ export default function Landing() {
                 <div className="font-serif text-base text-charcoal">East Village</div>
                 <div className="text-[9px] text-terracotta font-semibold mt-0.5">avg 8.2 · 12 places</div>
               </div>
-              <div className="hidden lg:block absolute -right-1 bottom-[130px] bg-warm-white rounded-xl px-4 py-3 shadow-lg z-10 rotate-2 animate-[floaty_6s_ease-in-out_infinite_3s]">
+              <div className="hidden lg:block absolute -right-4 bottom-[130px] bg-warm-white rounded-xl px-4 py-3 shadow-lg z-10 rotate-2 animate-[floaty_6s_ease-in-out_infinite_3s]">
                 <div className="text-[9px] text-text-muted font-medium mb-0.5">Friend activity</div>
                 <div className="font-serif text-base text-charcoal">Priya rated 9</div>
                 <div className="text-[9px] text-terracotta font-semibold mt-0.5">Café Integral · near you</div>
@@ -433,12 +474,18 @@ export default function Landing() {
             Your best experiences already exist — scattered across memory, notes apps, and group chats. 
             Vouch just puts them in one place.
           </p>
-          <div ref={reveal} className="opacity-0 translate-y-6 transition-all duration-700">
+          <div ref={reveal} className="opacity-0 translate-y-6 transition-all duration-700 flex gap-3 justify-center flex-wrap">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login', { state: { mode: 'register' } })}
               className="px-7 py-3.5 rounded-full bg-charcoal text-cream font-semibold text-[0.92rem] hover:bg-terracotta transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
             >
               Sign Up
+            </button>
+            <button
+              onClick={() => navigate('/login', { state: { mode: 'login' } })}
+              className="px-7 py-3.5 rounded-full border border-charcoal text-charcoal font-semibold text-[0.92rem] hover:bg-charcoal hover:text-cream transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              Log in
             </button>
           </div>
         </div>

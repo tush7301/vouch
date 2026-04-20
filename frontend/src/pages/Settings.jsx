@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, LogOut, User, Bell, Shield, HelpCircle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, LogOut, User, Bell, Shield, HelpCircle, ChevronRight, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from '../context/LocationContext';
 import PageHeader from '../components/layout/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
+import LocationPicker from '../components/ui/LocationPicker';
 
 const SECTIONS = [
   {
     label: 'Account',
     items: [
       { key: 'edit-profile', label: 'Edit Profile', icon: User, action: 'edit-profile' },
+      { key: 'location', label: 'Location', icon: MapPin, action: 'location' },
       { key: 'notifications', label: 'Notifications', icon: Bell, action: 'notifications' },
       { key: 'privacy', label: 'Privacy', icon: Shield, action: 'privacy' },
     ],
@@ -25,13 +28,18 @@ const SECTIONS = [
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { location } = useLocation();
   const navigate = useNavigate();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const handleAction = (action) => {
     switch (action) {
       case 'edit-profile':
         navigate('/profile');
+        break;
+      case 'location':
+        setShowLocationPicker(true);
         break;
       default:
         break;
@@ -45,6 +53,7 @@ export default function SettingsPage() {
 
   return (
     <div className="pb-20 lg:pb-8">
+      {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
       <PageHeader title="Settings">
         <button
           onClick={() => navigate(-1)}
@@ -83,7 +92,12 @@ export default function SettingsPage() {
                     }`}
                   >
                     <Icon size={18} className="text-secondary-text shrink-0" />
-                    <span className="text-sm font-medium text-primary-text flex-1 text-left">{item.label}</span>
+                    <div className="flex-1 text-left">
+                      <span className="text-sm font-medium text-primary-text">{item.label}</span>
+                      {item.key === 'location' && location && (
+                        <p className="text-xs text-secondary-text mt-0.5">{location.city}</p>
+                      )}
+                    </div>
                     <ChevronRight size={16} className="text-secondary-text shrink-0" />
                   </button>
                 );

@@ -1,10 +1,11 @@
 """
 Wishlist router — save / unsave experiences, list saved items.
 """
-from typing import List
+import math
+from typing import List, Optional
 from uuid import UUID as PyUUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -37,7 +38,7 @@ def get_wishlist_experiences(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get full experience objects for all wishlisted items."""
+    """Get full experience objects for all wishlisted items across all cities."""
     exp_ids = (
         db.query(Wishlist.experience_id)
         .filter(Wishlist.user_id == current_user.id)

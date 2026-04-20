@@ -70,10 +70,11 @@ export const api = {
     },
     get: (id) => request(`/experiences/${id}`),
     create: (data) => request('/experiences/', { method: 'POST', body: JSON.stringify(data) }),
-    searchPlaces: (q, lat, lng) => {
+    searchPlaces: (q, lat, lng, radius) => {
       const params = new URLSearchParams({ q });
       if (lat) params.set('lat', lat);
       if (lng) params.set('lng', lng);
+      if (radius) params.set('radius', radius);
       return request(`/experiences/external/places?${params}`);
     },
     searchEvents: (q, city) => {
@@ -94,10 +95,12 @@ export const api = {
 
   // ===== FEED =====
   feed: {
-    get: (cursor, category) => {
+    get: (cursor, category, lat, lng) => {
       const params = new URLSearchParams();
       if (cursor) params.set('cursor', cursor);
       if (category) params.set('category', category);
+      if (lat != null) params.set('lat', lat);
+      if (lng != null) params.set('lng', lng);
       const qs = params.toString();
       return request(`/feed/${qs ? `?${qs}` : ''}`);
     },
@@ -121,12 +124,30 @@ export const api = {
     getForUser: (userId) => request(`/users/${userId}/lists`),
   },
 
+  // ===== LISTS =====
+  lists: {
+    getMine: () => request('/lists/'),
+    getForUser: (userId) => request(`/lists/user/${userId}`),
+    get: (listId) => request(`/lists/${listId}`),
+    getExperiences: (listId) => request(`/lists/${listId}/experiences`),
+    create: (data) => request('/lists/', { method: 'POST', body: JSON.stringify(data) }),
+    update: (listId, data) => request(`/lists/${listId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    remove: (listId) => request(`/lists/${listId}`, { method: 'DELETE' }),
+    addItem: (listId, experienceId) =>
+      request(`/lists/${listId}/items/${experienceId}`, { method: 'POST' }),
+    removeItem: (listId, experienceId) =>
+      request(`/lists/${listId}/items/${experienceId}`, { method: 'DELETE' }),
+  },
+
   // ===== MAP =====
   map: {
     getPins: (params = {}) => {
       const qs = new URLSearchParams();
       if (params.category) qs.set('category', params.category);
       if (params.layer) qs.set('layer', params.layer);
+      if (params.lat != null) qs.set('lat', params.lat);
+      if (params.lng != null) qs.set('lng', params.lng);
+      if (params.radius_km != null) qs.set('radius_km', params.radius_km);
       const s = qs.toString();
       return request(`/map/pins${s ? `?${s}` : ''}`);
     },

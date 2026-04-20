@@ -10,7 +10,7 @@ export default function BookmarkIcon({ saved, onToggle, size = 20 }) {
     <button
       onClick={(e) => {
         e.stopPropagation();
-        onToggle();
+        onToggle(e);
       }}
       className="p-1.5 rounded-full hover:bg-surface transition-colors"
       aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}

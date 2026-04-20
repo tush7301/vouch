@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from '../context/LocationContext';
 import Button from '../components/ui/Button';
 import SectionLabel from '../components/ui/SectionLabel';
 import VouchLogo from '../components/ui/VouchLogo';
 import { CATEGORIES } from '../lib/constants';
 import { trackOnboardingStarted, trackOnboardingCategoriesSelected, trackOnboardingCompleted } from '../lib/analytics';
 
+const NYC_DEFAULT = { city: 'New York', latitude: 40.7128, longitude: -74.006 };
+
 /**
  * Onboarding — multi-step survey (welcome → category selection → friend connect → done).
  * Persists selected categories via the API and marks onboarding complete.
  */
 
-const STEPS = ['Welcome', 'Categories', 'Friends', 'Ready'];
+const STEPS = ['Welcome', 'Categories', 'Ready'];
 
 export default function Onboarding() {
   const { completeOnboarding, user } = useAuth();
+  const { location, setLocation } = useLocation();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
@@ -42,6 +46,10 @@ export default function Onboarding() {
     setError('');
     try {
       await completeOnboarding(selectedCategories.join(','));
+      // Default to New York if the user hasn't chosen a location yet
+      if (!location) {
+        setLocation(NYC_DEFAULT);
+      }
       trackOnboardingCompleted();
       navigate('/');
     } catch (err) {
@@ -114,31 +122,13 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 2 — Find Friends */}
+        {/* Step 2 — Ready */}
         {step === 2 && (
-          <div className="w-full max-w-sm lg:max-w-md text-center">
-            <SectionLabel text="Find Friends" />
-            <p className="mt-2 text-sm text-secondary-text leading-relaxed">
-              Vouch is better with friends. Connect your contacts to find people you already know.
-            </p>
-            <div className="mt-8 flex flex-col gap-3">
-              <Button variant="primary" size="lg" className="w-full" onClick={next}>
-                Connect contacts
-              </Button>
-              <Button variant="ghost" size="lg" className="w-full" onClick={next}>
-                Skip for now
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3 — Ready */}
-        {step === 3 && (
           <div className="w-full max-w-sm lg:max-w-md text-center">
             <span className="text-5xl">🎉</span>
             <h2 className="mt-4 font-serif text-2xl font-bold">You&apos;re all set!</h2>
             <p className="mt-2 text-sm text-secondary-text leading-relaxed">
-              Start exploring NYC through the eyes of people you trust.
+              Start exploring your city through the eyes of people you trust.
             </p>
             {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
             <Button

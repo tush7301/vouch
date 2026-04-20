@@ -9,6 +9,7 @@ All functions return normalised dicts that map to Experience model fields.
 Requires GOOGLE_PLACES_API_KEY in .env.
 Falls back to demo data when no API key is configured.
 """
+import math
 import httpx
 from typing import Optional
 
@@ -97,12 +98,13 @@ async def search_places(
     query: str,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
-    radius: int = 5000,
+    radius: int = 50000,
     max_results: int = 10,
 ) -> list[dict]:
     """
     Text search for places.
     Returns a list of normalised place dicts.
+    When lat/lng are provided, results are strictly restricted to that area.
     """
     if not settings.GOOGLE_PLACES_API_KEY:
         return _demo_places(query)
@@ -113,11 +115,22 @@ async def search_places(
         "languageCode": "en",
     }
 
-    if latitude and longitude:
-        body["locationBias"] = {
-            "circle": {
-                "center": {"latitude": latitude, "longitude": longitude},
-                "radius": radius,
+    if latitude is not None and longitude is not None:
+        # locationRestriction with rectangle strictly limits results to the area.
+        # (The Places API (New) only supports rectangle here, not circle.)
+        # We convert the radius in metres to a lat/lng bounding box.
+        lat_delta = radius / 111_000.0
+        lng_delta = radius / (111_000.0 * math.cos(math.radians(latitude)))
+        body["locationRestriction"] = {
+            "rectangle": {
+                "low": {
+                    "latitude": latitude - lat_delta,
+                    "longitude": longitude - lng_delta,
+                },
+                "high": {
+                    "latitude": latitude + lat_delta,
+                    "longitude": longitude + lng_delta,
+                },
             }
         }
 
@@ -139,10 +152,19 @@ async def get_place_details(place_id: str) -> Optional[dict]:
     if not settings.GOOGLE_PLACES_API_KEY:
         return None
 
+    # Single-place GET endpoint uses field names without the "places." prefix
+    detail_headers = {
+        "X-Goog-Api-Key": settings.GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": (
+            "id,displayName,formattedAddress,location,types,"
+            "primaryType,photos,editorialSummary,rating,googleMapsUri"
+        ),
+    }
+
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{BASE_URL}/places/{place_id}",
-            headers=_headers(),
+            headers=detail_headers,
             timeout=10,
         )
         if resp.status_code == 404:

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, Settings, Edit3, MapPin, Star, Bookmark, Users, ChevronRight } from 'lucide-react';
+import { LogOut, Settings, Edit3, MapPin, Star, Bookmark, Users, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/ui/Avatar';
 import VouchScore from '../components/ui/VouchScore';
@@ -22,71 +22,197 @@ const TABS = [
   { key: 'lists', label: 'Lists', icon: Users },
 ];
 
-// ── Rating Card ────────────────────────────────────────────────
-function RatingCard({ rating, onClick }) {
+// ── helpers ────────────────────────────────────────────────────
+function cityFromAddress(address, neighborhood) {
+  if (neighborhood) return neighborhood;
+  if (!address) return null;
+  // "123 Main St, Seattle, WA 98101" → "Seattle, WA"
+  const parts = address.split(',');
+  return parts.length >= 2 ? parts.slice(1).join(',').trim() : address;
+}
+
+// ── Rating Row ─────────────────────────────────────────────────
+function RatingRow({ rating, onClick }) {
+  const city = cityFromAddress(rating.experience_address, rating.experience_neighborhood);
   return (
-    <Card className="!p-0 overflow-hidden cursor-pointer" onClick={onClick}>
-      {rating.experience_cover_photo ? (
-        <div className="glass-card-img">
-          <img
-            src={rating.experience_cover_photo}
-            alt={rating.experience_name}
-            className="w-full h-28 object-cover"
-          />
-        </div>
-      ) : (
-        <div className="w-full h-28 bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
-          <MapPin size={24} className="text-stone" />
-        </div>
-      )}
-      <div className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <CategoryTag category={rating.experience_category} variant="gray" />
-          <VouchScore score={rating.overall_score} size="sm" />
-        </div>
-        <h4 className="font-serif text-sm font-bold mt-2 leading-tight line-clamp-2">
+    <div
+      className="flex items-center gap-4 p-3 glass rounded-2xl cursor-pointer hover:shadow-md transition-fluid group"
+      onClick={onClick}
+    >
+      {/* Thumbnail */}
+      <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
+        {rating.experience_cover_photo
+          ? <img src={rating.experience_cover_photo} alt={rating.experience_name} className="w-full h-full object-cover" />
+          : <MapPin size={20} className="text-stone" />}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <h4 className="font-serif text-sm font-bold text-primary-text group-hover:text-terracotta transition-fluid line-clamp-1">
           {rating.experience_name}
         </h4>
-        <div className="mt-1.5">
-          <ScoreLabel score={rating.overall_score} />
+        <div className="flex items-center gap-2 mt-0.5">
+          <CategoryTag category={rating.experience_category} variant="gray" />
         </div>
+        {city && (
+          <p className="text-xs text-secondary-text mt-1 flex items-center gap-1 line-clamp-1">
+            <MapPin size={10} className="shrink-0" />{city}
+          </p>
+        )}
         {rating.review_text && (
-          <p className="text-xs text-secondary-text mt-1.5 line-clamp-2">{rating.review_text}</p>
+          <p className="text-xs text-secondary-text/70 mt-0.5 line-clamp-1">{rating.review_text}</p>
         )}
       </div>
-    </Card>
+
+      {/* Score */}
+      <div className="shrink-0 flex flex-col items-end gap-0.5">
+        <VouchScore score={rating.overall_score} size="sm" />
+        <ScoreLabel score={rating.overall_score} />
+      </div>
+    </div>
   );
 }
 
-// ── Wishlist Card ──────────────────────────────────────────────
-function WishlistCard({ experience, onClick }) {
+// ── Wishlist Row ───────────────────────────────────────────────
+function WishlistRow({ experience, onClick }) {
+  const city = cityFromAddress(experience.address, experience.neighborhood);
   return (
-    <Card className="!p-0 overflow-hidden cursor-pointer" onClick={onClick}>
-      {experience.cover_photo_url ? (
-        <div className="glass-card-img">
-          <img
-            src={experience.cover_photo_url}
-            alt={experience.name}
-            className="w-full h-28 object-cover"
-          />
-        </div>
-      ) : (
-        <div className="w-full h-28 bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
-          <Bookmark size={24} className="text-stone" />
-        </div>
-      )}
-      <div className="p-3">
-        <CategoryTag category={experience.category} variant="gray" />
-        <h4 className="font-serif text-sm font-bold mt-2 leading-tight line-clamp-2">
+    <div
+      className="flex items-center gap-4 p-3 glass rounded-2xl cursor-pointer hover:shadow-md transition-fluid group"
+      onClick={onClick}
+    >
+      {/* Thumbnail */}
+      <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
+        {experience.cover_photo_url
+          ? <img src={experience.cover_photo_url} alt={experience.name} className="w-full h-full object-cover" />
+          : <Bookmark size={20} className="text-stone" />}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <h4 className="font-serif text-sm font-bold text-primary-text group-hover:text-terracotta transition-fluid line-clamp-1">
           {experience.name}
         </h4>
-        {experience.neighborhood && (
-          <p className="text-xs text-secondary-text mt-1 flex items-center gap-1">
-            <MapPin size={10} /> {experience.neighborhood}
+        <div className="flex items-center gap-2 mt-0.5">
+          <CategoryTag category={experience.category} variant="gray" />
+        </div>
+        {city && (
+          <p className="text-xs text-secondary-text mt-1 flex items-center gap-1 line-clamp-1">
+            <MapPin size={10} className="shrink-0" />{city}
           </p>
         )}
+        {experience.description && (
+          <p className="text-xs text-secondary-text/70 mt-0.5 line-clamp-1">{experience.description}</p>
+        )}
       </div>
-    </Card>
+
+      <ChevronRight size={16} className="text-secondary-text shrink-0" />
+    </div>
+  );
+}
+
+// ── List Row ───────────────────────────────────────────────────
+function ListRow({ list, onDelete }) {
+  return (
+    <div className="flex items-center gap-4 p-3 glass rounded-2xl group">
+      <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
+        {list.cover_photo_url
+          ? <img src={list.cover_photo_url} alt={list.name} className="w-full h-full object-cover" />
+          : <Users size={20} className="text-stone" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4 className="font-serif text-sm font-bold text-primary-text line-clamp-1">{list.name}</h4>
+        {list.description && (
+          <p className="text-xs text-secondary-text mt-0.5 line-clamp-1">{list.description}</p>
+        )}
+        <p className="text-[10px] text-secondary-text mt-1">
+          {list.item_count} {list.item_count === 1 ? 'place' : 'places'}
+          {!list.is_public && ' · Private'}
+        </p>
+      </div>
+      <button
+        onClick={onDelete}
+        className="shrink-0 p-2 text-text-muted hover:text-terracotta transition-fluid"
+        aria-label="Delete list"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ── Create List Modal ──────────────────────────────────────────
+function CreateListModal({ onClose, onCreate }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onCreate({ name: name.trim(), description: description.trim(), is_public: isPublic });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to create list');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center glass-overlay p-4">
+      <div className="glass-solid rounded-2xl shadow-xl w-full max-w-md animate-fade-up">
+        <div className="flex items-center justify-between p-4 border-b border-white/30">
+          <h2 className="font-serif text-lg font-bold">Create a list</h2>
+          <button onClick={onClose} className="text-secondary-text hover:text-primary-text text-xl transition-fluid">×</button>
+        </div>
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-secondary-text uppercase tracking-wider">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={200}
+              placeholder="e.g. Best date night spots"
+              autoFocus
+              className="mt-1 w-full px-3 py-2 glass-input rounded-xl text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-secondary-text uppercase tracking-wider">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={300}
+              rows={2}
+              placeholder="Optional"
+              className="mt-1 w-full px-3 py-2 glass-input rounded-xl text-sm resize-none"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-primary-text cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="accent-terracotta"
+            />
+            Public — visible to friends
+          </label>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+        <div className="flex gap-2 p-4 border-t border-white/30">
+          <Button variant="ghost" size="sm" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button size="sm" className="flex-1" onClick={handleCreate} disabled={saving || !name.trim()}>
+            {saving ? 'Creating…' : 'Create'}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -202,6 +328,8 @@ export default function Profile() {
   const [stats, setStats] = useState(null);
   const [ratings, setRatings] = useState([]);
   const [wishlistItems, setWishlistItems] = useState([]);
+  const [lists, setLists] = useState([]);
+  const [showCreateList, setShowCreateList] = useState(false);
   const [activeTab, setActiveTab] = useState('ratings');
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
@@ -225,6 +353,9 @@ export default function Profile() {
       }
       if (isOwnProfile) {
         promises.push(api.wishlist.getExperiences());
+        promises.push(api.lists.getMine().catch(() => []));
+      } else {
+        promises.push(api.lists.getForUser(profileUserId).catch(() => []));
       }
 
       const results = await Promise.all(promises);
@@ -233,9 +364,11 @@ export default function Profile() {
 
       if (!isOwnProfile) {
         setProfileUser(results[2]);
+        setLists(results[3] || []);
       } else {
         setProfileUser(user);
         setWishlistItems(results[2] || []);
+        setLists(results[3] || []);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -519,7 +652,19 @@ export default function Profile() {
             {/* Ratings tab */}
             {activeTab === 'ratings' && (
               <div>
-                {ratings.length === 0 ? (
+                {ratings.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {ratings.map((r) => (
+                      <RatingRow
+                        key={r.id}
+                        rating={r}
+                        onClick={() => navigate(`/experience/${r.experience_id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {ratings.length === 0 && (
                   <div className="py-12 text-center glass rounded-2xl">
                     <Star size={28} className="mx-auto text-stone mb-2" />
                     <p className="text-sm text-secondary-text">
@@ -530,16 +675,6 @@ export default function Profile() {
                         Find experiences
                       </Button>
                     )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
-                    {ratings.map((r) => (
-                      <RatingCard
-                        key={r.id}
-                        rating={r}
-                        onClick={() => navigate(`/experience/${r.experience_id}`)}
-                      />
-                    ))}
                   </div>
                 )}
               </div>
@@ -557,9 +692,9 @@ export default function Profile() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+                  <div className="flex flex-col gap-2">
                     {wishlistItems.map((exp) => (
-                      <WishlistCard
+                      <WishlistRow
                         key={exp.id}
                         experience={exp}
                         onClick={() => navigate(`/experience/${exp.id}`)}
@@ -572,10 +707,40 @@ export default function Profile() {
 
             {/* Lists tab */}
             {activeTab === 'lists' && isOwnProfile && (
-              <div className="py-12 text-center glass rounded-2xl">
-                <Users size={28} className="mx-auto text-stone mb-2" />
-                <p className="text-sm text-secondary-text">No lists yet</p>
-                <Button variant="ghost" size="sm" className="mt-3">Create your first list</Button>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-secondary-text">
+                    {lists.length} {lists.length === 1 ? 'list' : 'lists'}
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={() => setShowCreateList(true)}>
+                    <Plus size={14} className="mr-1" /> New list
+                  </Button>
+                </div>
+                {lists.length === 0 ? (
+                  <div className="py-12 text-center glass rounded-2xl">
+                    <Users size={28} className="mx-auto text-stone mb-2" />
+                    <p className="text-sm text-secondary-text">No lists yet</p>
+                    <Button variant="ghost" size="sm" className="mt-3" onClick={() => setShowCreateList(true)}>
+                      Create your first list
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {lists.map((lst) => (
+                      <ListRow
+                        key={lst.id}
+                        list={lst}
+                        onDelete={async () => {
+                          if (!confirm(`Delete "${lst.name}"?`)) return;
+                          try {
+                            await api.lists.remove(lst.id);
+                            setLists((ls) => ls.filter((x) => x.id !== lst.id));
+                          } catch (e) { console.error(e); }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -598,6 +763,17 @@ export default function Profile() {
           people={peopleModal.people}
           onClose={() => setPeopleModal(null)}
           onViewProfile={viewUserProfile}
+        />
+      )}
+
+      {/* Create list modal */}
+      {showCreateList && (
+        <CreateListModal
+          onClose={() => setShowCreateList(false)}
+          onCreate={async (data) => {
+            const newList = await api.lists.create(data);
+            setLists((ls) => [newList, ...ls]);
+          }}
         />
       )}
     </div>

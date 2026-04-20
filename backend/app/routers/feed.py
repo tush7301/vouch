@@ -138,8 +138,17 @@ def _friend_activity(
     return items
 
 
-def _vouch_picks(db: Session, user: User, exclude_ids: set[UUID], limit: int) -> list[FeedItem]:
-    """Top-rated experiences in the user's preferred categories."""
+def _vouch_picks(
+    db: Session,
+    user: User,
+    exclude_ids: set[UUID],
+    limit: int,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: float = 50.0,
+) -> list[FeedItem]:
+    """Top-rated experiences in the user's preferred categories, optionally near a location."""
+    import math
     cats = [c.strip() for c in (user.selected_categories or "").split(",") if c.strip()]
 
     q = (
@@ -156,6 +165,15 @@ def _vouch_picks(db: Session, user: User, exclude_ids: set[UUID], limit: int) ->
         q = q.filter(Experience.category.in_(cats))
     if exclude_ids:
         q = q.filter(~Experience.id.in_(exclude_ids))
+    if lat is not None and lng is not None:
+        lat_delta = radius_km / 111.0
+        lng_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
+        q = q.filter(
+            Experience.latitude >= lat - lat_delta,
+            Experience.latitude <= lat + lat_delta,
+            Experience.longitude >= lng - lng_delta,
+            Experience.longitude <= lng + lng_delta,
+        )
 
     rows = q.order_by(desc("avg_score")).limit(limit).all()
 
@@ -227,6 +245,8 @@ def _trending(db: Session, exclude_ids: set[UUID], limit: int) -> list[FeedItem]
 def get_feed(
     cursor: str | None = Query(None, description="ISO timestamp cursor for pagination"),
     category: str | None = Query(None, description="Optional category filter"),
+    lat: float | None = Query(None, description="Latitude for location-aware Vouch Picks"),
+    lng: float | None = Query(None, description="Longitude for location-aware Vouch Picks"),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
 ):
@@ -252,9 +272,9 @@ def get_feed(
         items.extend(friend_items)
         seen_experience_ids.update(fi.experience.id for fi in friend_items if fi.experience)
 
-        # 2. Vouch Picks — exclude experiences already seen in friend activity
-        pick_limit = max(3, PAGE_SIZE - len(friend_items))
-        picks = _vouch_picks(db, current_user, seen_experience_ids, limit=pick_limit)
+        # 2. Vouch Picks — location-aware, exclude experiences already seen
+        pick_limit = max(6, PAGE_SIZE - len(friend_items))
+        picks = _vouch_picks(db, current_user, seen_experience_ids, limit=pick_limit, lat=lat, lng=lng)
         if category:
             picks = [p for p in picks if p.experience and p.experience.category == category]
         seen_experience_ids.update(p.experience.id for p in picks if p.experience)

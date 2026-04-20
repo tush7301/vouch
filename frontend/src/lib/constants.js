@@ -71,4 +71,7 @@ export const NAV_ITEMS = [
 // VITE_API_URL can be a full URL or just a hostname from Render
 const _raw = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const _apiBase = _raw.startsWith('http') ? _raw : `https://${_raw}`;
-export const API_BASE_URL = _apiBase.endsWith('/api/v1') ? _apiBase : `${_apiBase.replace(/\/+$/, '')}/api/v1`;
+const _normalizedBase = _apiBase.replace(/\/+$/, '');
+export const API_BASE_URL = _normalizedBase.endsWith('/api/v1')
+  ? _normalizedBase
+  : `${_normalizedBase}/api/v1`;

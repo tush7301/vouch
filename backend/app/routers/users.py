@@ -1,3 +1,4 @@
+import math
 import os
 from typing import List, Optional
 
@@ -171,17 +172,27 @@ def get_user_stats(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/ratings", response_model=list[ProfileRatingOut])
-def get_user_ratings_enriched(user_id: str, db: Session = Depends(get_db)):
-    """Get all ratings for a user with experience name/category/photo."""
+def get_user_ratings_enriched(
+    user_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get all ratings for a user with experience name/category/photo/address."""
     rows = (
-        db.query(Rating, Experience.name, Experience.category, Experience.cover_photo_url)
+        db.query(
+            Rating,
+            Experience.name,
+            Experience.category,
+            Experience.cover_photo_url,
+            Experience.address,
+            Experience.neighborhood,
+        )
         .join(Experience, Rating.experience_id == Experience.id)
         .filter(Rating.user_id == user_id)
         .order_by(Rating.created_at.desc())
         .all()
     )
     result = []
-    for rating, exp_name, exp_category, exp_photo in rows:
+    for rating, exp_name, exp_category, exp_photo, exp_address, exp_neighborhood in rows:
         result.append(ProfileRatingOut(
             id=rating.id,
             user_id=rating.user_id,
@@ -189,6 +200,8 @@ def get_user_ratings_enriched(user_id: str, db: Session = Depends(get_db)):
             experience_name=exp_name,
             experience_category=exp_category,
             experience_cover_photo=exp_photo or "",
+            experience_address=exp_address or "",
+            experience_neighborhood=exp_neighborhood or "",
             vibe_score=rating.vibe_score,
             value_score=rating.value_score,
             experience_score=rating.experience_score,

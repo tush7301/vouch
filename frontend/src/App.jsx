@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { LocationProvider } from './context/LocationContext';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import BottomNav from './components/layout/BottomNav';
 import SideNav from './components/layout/SideNav';
@@ -26,7 +27,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <LocationProvider>
+          <Routes>
           {/* Public — auth pages (no nav) */}
           <Route path="/landing" element={<Landing />} />
           <Route path="/login" element={<Login />} />
@@ -58,7 +60,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-        </Routes>
+          </Routes>
+        </LocationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

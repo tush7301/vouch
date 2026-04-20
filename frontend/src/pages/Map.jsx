@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ChipStrip from '../components/ui/ChipStrip';
+import LocationPicker from '../components/ui/LocationPicker';
+import { useLocation } from '../context/LocationContext';
+import { LocateFixed, MapPin as MapPinIcon } from 'lucide-react';
 import VouchScore from '../components/ui/VouchScore';
+import ScoreLabel from '../components/ui/ScoreLabel';
 import CategoryTag from '../components/ui/CategoryTag';
+import PhotoCarousel from '../components/ui/PhotoCarousel';
 import { CATEGORIES, COLORS } from '../lib/constants';
 import { api } from '../lib/api';
 
@@ -27,20 +32,12 @@ function createIcon(color, size = 28) {
   });
 }
 
-const SCORE_COLORS = {
-  high: COLORS.sage,          // 9-10
-  good: COLORS.amber,         // 7-8
-  mid: COLORS.stone,          // 5-6
-  low: COLORS.terracotta,     // 0-4
-  none: '#9B9B9B',            // unrated
-};
-
+// All pins use the Vouch terracotta tint; rated pins are fully opaque,
+// unrated pins dial the opacity back slightly so they visually recede.
 function iconForScore(avg) {
-  if (avg >= 9) return createIcon(SCORE_COLORS.high);
-  if (avg >= 7) return createIcon(SCORE_COLORS.good);
-  if (avg >= 5) return createIcon(SCORE_COLORS.mid);
-  if (avg > 0) return createIcon(SCORE_COLORS.low);
-  return createIcon(SCORE_COLORS.none);
+  const size = avg > 0 ? 30 : 26;
+  const color = avg > 0 ? COLORS.terracotta : COLORS.terracotta + 'B3'; // ~70% opacity hex
+  return createIcon(color, size);
 }
 
 // ── Layer definitions ──────────────────────────────────────────
@@ -51,59 +48,47 @@ const LAYERS = [
   { key: 'wishlist', label: 'Wishlist' },
 ];
 
-// ── Center map on pins ─────────────────────────────────────────
-function FitBounds({ pins }) {
+// ── Set map center imperatively (stable: only re-runs when lat/lng values change) ──
+function SetCenter({ lat, lng }) {
   const map = useMap();
   useEffect(() => {
-    if (pins.length > 0) {
-      const bounds = L.latLngBounds(pins.map((p) => [p.latitude, p.longitude]));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-    }
-  }, [pins, map]);
+    map.setView([lat, lng], 13);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, map]);
   return null;
 }
 
-// ── Neighborhood list panel ────────────────────────────────────
-function NeighborhoodPanel({ neighborhoods, onSelect }) {
-  if (!neighborhoods.length) return null;
-  return (
-    <div className="bg-warm-white/95 backdrop-blur-sm rounded-xl border border-stone-light shadow-lg p-3 max-h-64 overflow-y-auto">
-      <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
-        Neighborhoods
-      </h3>
-      <div className="space-y-1">
-        {neighborhoods.map((n) => (
-          <button
-            key={n.name}
-            onClick={() => onSelect(n.name)}
-            className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-cream-deep transition-vouch flex items-center justify-between"
-          >
-            <span className="text-sm font-medium text-charcoal">{n.name}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted">{n.experience_count} places</span>
-              {n.avg_score > 0 && (
-                <span className="text-xs font-bold text-terracotta">{n.avg_score}</span>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+// ── Fit map to bounding box of pins. Fires whenever `trigger` changes,
+// so filtered layers (mine/friends/wishlist) re-pan the map to their pins. ──
+function FitBounds({ pins, trigger }) {
+  const map = useMap();
+  useEffect(() => {
+    if (pins.length === 0) return;
+    if (pins.length === 1) {
+      map.setView([pins[0].latitude, pins[0].longitude], 14);
+      return;
+    }
+    const bounds = L.latLngBounds(pins.map((p) => [p.latitude, p.longitude]));
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger, map]);
+  return null;
 }
 
 // ── Main map component ─────────────────────────────────────────
 export default function MapPage() {
   const navigate = useNavigate();
+  const { location } = useLocation();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeLayer, setActiveLayer] = useState('all');
   const [pins, setPins] = useState([]);
-  const [neighborhoods, setNeighborhoods] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showPanel, setShowPanel] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
-  // Default center: Manhattan, NYC
-  const defaultCenter = [40.7580, -73.9855];
+  // Center: user's saved location, or fall back to Manhattan
+  const defaultCenter = location
+    ? [location.latitude, location.longitude]
+    : [40.7580, -73.9855];
 
   const loadPins = useCallback(async () => {
     setLoading(true);
@@ -111,6 +96,14 @@ export default function MapPage() {
       const params = {};
       if (selectedCategory) params.category = selectedCategory;
       if (activeLayer !== 'all') params.layer = activeLayer;
+      // Scope pins to the user's city (default ~50 km radius). For the "Mine"
+      // / "Friends" / "Wishlist" layers we drop the proximity filter so users
+      // can see their places anywhere in the country.
+      if (location && activeLayer === 'all') {
+        params.lat = location.latitude;
+        params.lng = location.longitude;
+        params.radius_km = 50;
+      }
       const data = await api.map.getPins(params);
       setPins(data || []);
     } catch {
@@ -118,21 +111,11 @@ export default function MapPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, activeLayer]);
-
-  const loadNeighborhoods = useCallback(async () => {
-    try {
-      const data = await api.map.getNeighborhoods(selectedCategory || undefined);
-      setNeighborhoods(data || []);
-    } catch {
-      setNeighborhoods([]);
-    }
-  }, [selectedCategory]);
+  }, [selectedCategory, activeLayer, location]);
 
   useEffect(() => {
     loadPins();
-    loadNeighborhoods();
-  }, [loadPins, loadNeighborhoods]);
+  }, [loadPins]);
 
   const handleCategoryChange = (cat) => {
     setSelectedCategory(cat === selectedCategory ? null : cat);
@@ -140,6 +123,7 @@ export default function MapPage() {
 
   return (
     <div className="pb-20 lg:pb-0 h-[100dvh] flex flex-col">
+      {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
 
       {/* Category filter */}
       <div className="px-4 lg:px-8 py-2">
@@ -166,17 +150,14 @@ export default function MapPage() {
           </button>
         ))}
 
-        {/* Neighborhood toggle */}
-        <button
-          onClick={() => setShowPanel((s) => !s)}
-          className={`text-xs px-3 py-1.5 rounded-full font-medium transition-vouch ml-auto ${
-            showPanel
-              ? 'bg-charcoal text-cream'
-              : 'bg-warm-white border border-stone text-text-muted hover:border-terracotta'
-          }`}
+        {/* Location display — read-only. Edit from the sidebar. */}
+        <div
+          title="Change your location from the sidebar"
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium bg-warm-white border border-stone text-text-muted ml-auto select-none cursor-default"
         >
-          Neighborhoods
-        </button>
+          <LocateFixed size={12} className={location ? 'text-terracotta' : 'text-text-muted'} />
+          {location ? location.city.split(',')[0] : 'Set location'}
+        </div>
       </div>
 
       {/* Map + overlays */}
@@ -187,20 +168,31 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Neighborhood panel overlay */}
-        {showPanel && (
-          <div className="absolute top-3 right-3 z-[1000] w-64">
-            <NeighborhoodPanel neighborhoods={neighborhoods} onSelect={(name) => {
-              // Filter by neighborhood — for now just close panel
-              setShowPanel(false);
-            }} />
+        {/* Pin count badge — scoped to current city + category filter */}
+        <div className="absolute top-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-full px-3 py-1 shadow-sm border border-stone-light">
+          <span className="text-xs font-semibold text-primary-text">
+            {pins.length} {selectedCategory ? selectedCategory : 'places'}
+            {location && activeLayer === 'all' && (
+              <span className="text-secondary-text font-normal"> in {location.city.split(',')[0]}</span>
+            )}
+          </span>
+        </div>
+
+        {/* Empty state for filtered layers */}
+        {!loading && pins.length === 0 && activeLayer !== 'all' && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-warm-white/95 backdrop-blur-sm rounded-lg px-4 py-3 shadow-sm border border-stone-light text-center max-w-[280px]">
+            <p className="text-xs text-primary-text font-semibold">
+              {activeLayer === 'mine' && 'You haven\u2019t rated any places yet.'}
+              {activeLayer === 'friends' && 'No ratings from friends yet.'}
+              {activeLayer === 'wishlist' && 'Your wishlist is empty.'}
+            </p>
+            <p className="text-[10px] text-secondary-text mt-1">
+              {activeLayer === 'mine' && 'Rate an experience and it\u2019ll show up here.'}
+              {activeLayer === 'friends' && 'Follow friends to see their picks on the map.'}
+              {activeLayer === 'wishlist' && 'Bookmark places and they\u2019ll appear here.'}
+            </p>
           </div>
         )}
-
-        {/* Pin count badge */}
-        <div className="absolute top-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-full px-3 py-1 shadow-sm border border-stone-light">
-          <span className="text-xs font-semibold text-primary-text">{pins.length} places</span>
-        </div>
 
         <MapContainer
           center={defaultCenter}
@@ -208,12 +200,23 @@ export default function MapPage() {
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
         >
+          {/* CartoDB Positron, warm-tinted via CSS to match the cream palette. */}
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            subdomains="abcd"
+            maxZoom={20}
+            className="vouch-map-tiles"
           />
 
-          {pins.length > 0 && <FitBounds pins={pins} />}
+          {/* Only center on user location when viewing ALL pins with no category.
+              When a layer/category filter is active, fit to the filtered pins instead. */}
+          {activeLayer === 'all' && !selectedCategory && (
+            <SetCenter lat={defaultCenter[0]} lng={defaultCenter[1]} />
+          )}
+          {(activeLayer !== 'all' || selectedCategory || !location) && pins.length > 0 && (
+            <FitBounds pins={pins} trigger={`${activeLayer}-${selectedCategory || ''}-${pins.length}`} />
+          )}
 
           {pins.map((pin) => (
             <Marker
@@ -222,53 +225,62 @@ export default function MapPage() {
               icon={iconForScore(pin.avg_score)}
             >
               <Popup>
-                <div className="min-w-[200px]">
-                  {/* Cover photo */}
-                  {pin.cover_photo_url && (
-                    <img
-                      src={pin.cover_photo_url}
-                      alt={pin.name}
-                      className="w-full h-24 object-cover rounded-t-lg -mt-3 -mx-3 mb-2"
-                      style={{ width: 'calc(100% + 24px)' }}
-                    />
+                <div className="w-[240px]">
+                  {/* Square cover photo — matches feed/detail */}
+                  {pin.cover_photo_url ? (
+                    <div className="-mt-3 -mx-3 mb-3">
+                      <PhotoCarousel
+                        coverUrl={pin.cover_photo_url}
+                        photoUrlsStr={pin.photo_urls}
+                        alt={pin.name}
+                      />
+                    </div>
+                  ) : (
+                    <div className="-mt-3 -mx-3 mb-3 aspect-square w-[calc(100%+24px)] bg-gradient-to-br from-stone-light/50 to-cream-deep/50 flex items-center justify-center">
+                      <MapPinIcon size={32} className="text-stone" />
+                    </div>
                   )}
 
+                  {/* Title + score */}
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <h3
-                        className="font-bold text-sm cursor-pointer hover:text-terracotta transition-vouch"
+                        className="font-serif font-bold text-sm text-primary-text cursor-pointer hover:text-terracotta transition-fluid line-clamp-1"
                         onClick={() => navigate(`/experience/${pin.id}`)}
                       >
                         {pin.name}
                       </h3>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-stone-light rounded text-text-muted inline-block mt-1">
-                        {pin.category}
-                      </span>
+                      <div className="mt-1.5">
+                        <CategoryTag category={pin.category} />
+                      </div>
                     </div>
                     {pin.avg_score > 0 && (
-                      <div className="text-center shrink-0">
-                        <div className="w-9 h-9 rounded-full bg-terracotta text-white font-bold flex items-center justify-center text-sm">
-                          {pin.avg_score}
-                        </div>
-                        <span className="text-[9px] text-text-muted">{pin.num_ratings}r</span>
+                      <div className="shrink-0 flex flex-col items-end gap-0.5">
+                        <VouchScore score={pin.avg_score} size="sm" />
+                        <ScoreLabel score={pin.avg_score} />
                       </div>
                     )}
                   </div>
 
-                  {pin.address && (
-                    <p className="text-[11px] text-text-muted mt-1">{pin.address}</p>
+                  {/* Neighborhood / address */}
+                  {(pin.neighborhood || pin.address) && (
+                    <p className="text-xs text-secondary-text mt-2 flex items-center gap-1 line-clamp-1">
+                      <MapPinIcon size={10} className="shrink-0" />
+                      {pin.neighborhood || pin.address}
+                    </p>
                   )}
 
-                  <div className="flex gap-2 mt-2">
+                  {/* Actions */}
+                  <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => navigate(`/experience/${pin.id}`)}
-                      className="flex-1 bg-charcoal text-cream text-[11px] font-semibold py-1.5 rounded-full hover:bg-terracotta transition-vouch"
+                      className="flex-1 bg-charcoal text-cream text-xs font-semibold py-2 rounded-full hover:bg-terracotta transition-fluid"
                     >
                       View
                     </button>
                     <button
                       onClick={() => navigate(`/rate/${pin.id}`)}
-                      className="flex-1 border border-terracotta text-terracotta text-[11px] font-semibold py-1.5 rounded-full hover:bg-terracotta/5 transition-vouch"
+                      className="flex-1 border border-terracotta text-terracotta text-xs font-semibold py-2 rounded-full hover:bg-terracotta/5 transition-fluid"
                     >
                       Rate
                     </button>
@@ -279,31 +291,6 @@ export default function MapPage() {
           ))}
         </MapContainer>
 
-        {/* Legend */}
-        <div className="absolute bottom-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-sm border border-stone-light">
-          <div className="flex items-center gap-3 text-[10px]">
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SCORE_COLORS.high }} />
-              9-10
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SCORE_COLORS.good }} />
-              7-8
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SCORE_COLORS.mid }} />
-              5-6
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SCORE_COLORS.low }} />
-              0-4
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SCORE_COLORS.none }} />
-              N/A
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

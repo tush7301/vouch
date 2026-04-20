@@ -1,8 +1,8 @@
 """
 Map router — geo-pins for experiences and neighbourhood aggregations.
 """
+import math
 from typing import Optional, List as TList
-from uuid import UUID as PyUUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, desc
@@ -24,12 +24,15 @@ router = APIRouter(prefix="/map", tags=["map"])
 def get_map_pins(
     category: Optional[str] = None,
     layer: Optional[str] = Query(None, description="mine | friends | wishlist | all"),
+    lat: Optional[float] = Query(None, description="User latitude for proximity filter"),
+    lng: Optional[float] = Query(None, description="User longitude for proximity filter"),
+    radius_km: float = Query(50.0, description="Radius in km when lat/lng provided"),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """
     Return experiences that have lat/lng, with their average score.
-    Filterable by category and layer (my ratings, friends', wishlist, or all).
+    Filterable by category, layer, and proximity (lat/lng/radius_km).
     """
     # Base: experiences with coordinates
     base = (
@@ -45,6 +48,15 @@ def get_map_pins(
 
     if category:
         base = base.filter(Experience.category == category)
+
+    # Proximity filter — bounding box approximation (1° lat ≈ 111 km)
+    if lat is not None and lng is not None:
+        lat_delta = radius_km / 111.0
+        lng_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
+        base = base.filter(
+            Experience.latitude.between(lat - lat_delta, lat + lat_delta),
+            Experience.longitude.between(lng - lng_delta, lng + lng_delta),
+        )
 
     # Layer filtering (requires auth)
     if current_user and layer == "mine":

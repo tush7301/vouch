@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import VouchLogo from '../components/ui/VouchLogo';
 import { trackLoginPageViewed, trackSignupStarted, trackLoginCompleted, trackSignupCompleted } from '../lib/analytics';
 
-const GOOGLE_CLIENT_ID = '745899766698-58m0aqf28p5v5kll7vhc0lbjrnd8rcjr.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 /**
  * Login — Liquid glass auth page with floating blobs and translucent form.
@@ -13,9 +13,11 @@ const GOOGLE_CLIENT_ID = '745899766698-58m0aqf28p5v5kll7vhc0lbjrnd8rcjr.apps.goo
 export default function Login() {
   const { login, register, loginGoogle, loginInstagram } = useAuth();
   const navigate = useNavigate();
+  const routeLocation = useLocation();
   const googleInitialized = useRef(false);
 
-  const [mode, setMode] = useState('login');
+  const initialMode = routeLocation.state?.mode === 'register' ? 'register' : 'login';
+  const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
@@ -26,8 +28,39 @@ export default function Login() {
   // Track login page view
   useEffect(() => { trackLoginPageViewed(); }, []);
 
+  // Typewriter effect for the tagline.
+  const TAGLINE_PREFIX = 'Your social life, ';
+  const TAGLINE_SUFFIX = 'ranked.';
+  const FULL_LEN = TAGLINE_PREFIX.length + TAGLINE_SUFFIX.length;
+  const [typedLen, setTypedLen] = useState(0);
+  useEffect(() => {
+    setTypedLen(0);
+    const startDelay = setTimeout(() => {
+      let i = 0;
+      const interval = setInterval(() => {
+        i += 1;
+        setTypedLen(i);
+        if (i >= FULL_LEN) clearInterval(interval);
+      }, 55);
+      // Stash on window so the next-layer cleanup can clear it even after unmount.
+      return () => clearInterval(interval);
+    }, 350);
+    return () => clearTimeout(startDelay);
+  }, [FULL_LEN]);
+
+  const typedPrefix = TAGLINE_PREFIX.slice(0, Math.min(typedLen, TAGLINE_PREFIX.length));
+  const typedSuffix = typedLen > TAGLINE_PREFIX.length
+    ? TAGLINE_SUFFIX.slice(0, typedLen - TAGLINE_PREFIX.length)
+    : '';
+  const typingDone = typedLen >= FULL_LEN;
+
   useEffect(() => {
     if (googleInitialized.current) return;
+
+    if (!GOOGLE_CLIENT_ID) {
+      setError('Google Sign-In is not configured. Set VITE_GOOGLE_CLIENT_ID.');
+      return;
+    }
 
     const initGoogle = () => {
       if (!window.google?.accounts?.id) return;
@@ -117,9 +150,16 @@ export default function Login() {
 
       {/* Logo / wordmark */}
       <div className="mb-8 text-center relative z-10">
-        <VouchLogo size="lg" />
-        <p className="mt-3 text-text-muted text-sm lg:text-base max-w-[260px] lg:max-w-md mx-auto">
-          Your social life, ranked.
+        <div className="animate-fade-up">
+          <VouchLogo size="lg" />
+        </div>
+        <p className="mt-3 text-text-muted text-sm lg:text-base max-w-[260px] lg:max-w-md mx-auto min-h-[1.4em]">
+          {typedPrefix}
+          <em className="italic text-terracotta not-italic-placeholder" style={{ fontStyle: 'italic' }}>{typedSuffix}</em>
+          <span
+            aria-hidden="true"
+            className={`inline-block w-[2px] h-[1em] align-[-2px] ml-0.5 bg-terracotta ${typingDone ? 'animate-pulse' : ''}`}
+          />
         </p>
       </div>
 
@@ -138,25 +178,6 @@ export default function Login() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
             Continue with Google
-          </button>
-
-          <button
-            onClick={handleInstagram}
-            className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-full glass-input font-semibold text-sm hover:bg-white/60 transition-fluid"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <defs>
-                <linearGradient id="ig" x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#FFDC80" />
-                  <stop offset=".5" stopColor="#F56040" />
-                  <stop offset="1" stopColor="#833AB4" />
-                </linearGradient>
-              </defs>
-              <rect x="2" y="2" width="20" height="20" rx="6" stroke="url(#ig)" strokeWidth="2" />
-              <circle cx="12" cy="12" r="5" stroke="url(#ig)" strokeWidth="2" />
-              <circle cx="17.5" cy="6.5" r="1.5" fill="url(#ig)" />
-            </svg>
-            Continue with Instagram
           </button>
 
           <div className="flex items-center gap-3 my-1">

@@ -283,3 +283,12 @@ body::before {
 .animate-fade-up {
   animation: fade-up 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
+
+/* ===== MAP TILES — warm cream tint to match Vouch palette ===== */
+.vouch-map-tiles {
+  filter: sepia(0.35) saturate(0.75) hue-rotate(-8deg) brightness(1.03);
+}
+.leaflet-container {
+  background: #F5EFE4; /* cream-deep fallback while tiles load */
+  font-family: inherit;
+}
