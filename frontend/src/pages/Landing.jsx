@@ -84,16 +84,16 @@ export default function Landing() {
           <VouchLogo size="sm" />
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/login', { state: { mode: 'login' } })}
-              className="px-4 py-2 rounded-full text-charcoal text-sm font-semibold hover:text-terracotta transition-all duration-300"
-            >
-              Log in
-            </button>
-            <button
               onClick={() => navigate('/login', { state: { mode: 'register' } })}
               className="px-5 py-2.5 rounded-full bg-charcoal text-cream text-sm font-semibold hover:bg-terracotta transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
             >
               Sign Up
+            </button>
+            <button
+              onClick={() => navigate('/login', { state: { mode: 'login' } })}
+              className="px-4 py-2 rounded-full text-charcoal text-sm font-semibold hover:text-terracotta transition-all duration-300"
+            >
+              Log in
             </button>
           </div>
         </div>
