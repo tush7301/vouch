@@ -199,8 +199,24 @@ def _vouch_picks(
     return items
 
 
-def _trending(db: Session, exclude_ids: set[UUID], limit: int) -> list[FeedItem]:
-    """Experiences with the most ratings in the last 30 days."""
+def _trending(
+    db: Session,
+    exclude_ids: set[UUID],
+    limit: int,
+    user: User | None = None,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: float = 50.0,
+) -> list[FeedItem]:
+    """Experiences with the most ratings in the last 30 days.
+
+    When `user` has `selected_categories`, we restrict to those — otherwise
+    "trending" drowns a Food user's feed with nightclub vouches. Likewise
+    lat/lng scopes trending to the user's city so Tokyo nightlife doesn't
+    surface to an NYC user's For You tab.
+    """
+    import math
+
     since = datetime.utcnow() - timedelta(days=30)
 
     q = (
@@ -215,6 +231,19 @@ def _trending(db: Session, exclude_ids: set[UUID], limit: int) -> list[FeedItem]
     )
     if exclude_ids:
         q = q.filter(~Experience.id.in_(exclude_ids))
+
+    if user:
+        cats = [c.strip() for c in (user.selected_categories or "").split(",") if c.strip()]
+        if cats:
+            q = q.filter(Experience.category.in_(cats))
+
+    if lat is not None and lng is not None:
+        lat_delta = radius_km / 111.0
+        lng_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
+        q = q.filter(
+            Experience.latitude.between(lat - lat_delta, lat + lat_delta),
+            Experience.longitude.between(lng - lng_delta, lng + lng_delta),
+        )
 
     rows = q.order_by(desc("num_ratings"), desc("avg_score")).limit(limit).all()
 
@@ -281,9 +310,18 @@ def get_feed(
     else:
         picks = []
 
-    # 3. Trending — exclude experiences already seen in friend activity + picks
+    # 3. Trending — exclude experiences already seen in friend activity + picks.
+    # Filtered by the user's selected categories + their city so new users
+    # don't see e.g. Tokyo nightlife in a "For You" feed.
     trend_limit = max(3, PAGE_SIZE - len(items) - len(picks))
-    trending_items = _trending(db, seen_experience_ids, limit=trend_limit)
+    trending_items = _trending(
+        db,
+        seen_experience_ids,
+        limit=trend_limit,
+        user=current_user,
+        lat=lat,
+        lng=lng,
+    )
     if category:
         trending_items = [t for t in trending_items if t.experience and t.experience.category == category]
 
