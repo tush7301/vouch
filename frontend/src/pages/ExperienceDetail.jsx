@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Star, Clock, Bookmark, PenLine, Sparkles, Flame } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Clock, Bookmark, PenLine, Sparkles, Flame, FolderPlus, Check, Plus, X } from 'lucide-react';
 import PhotoCarousel from '../components/ui/PhotoCarousel';
 import VouchScore from '../components/ui/VouchScore';
 import ScoreLabel from '../components/ui/ScoreLabel';
@@ -20,6 +20,7 @@ export default function ExperienceDetail() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
   const [myRating, setMyRating] = useState(null);
+  const [showListPicker, setShowListPicker] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -205,25 +206,34 @@ export default function ExperienceDetail() {
             <ArrowLeft size={20} />
             <span className="text-sm font-medium">Back</span>
           </button>
-          <button
-            onClick={async () => {
-              try {
-                if (saved) {
-                  await api.wishlist.remove(id);
-                  setSaved(false);
-                } else {
-                  await api.wishlist.add(id);
-                  setSaved(true);
-                }
-              } catch { /* ignore */ }
-            }}
-            className="p-2 rounded-full hover:bg-surface transition-colors"
-          >
-            <Bookmark
-              size={20}
-              className={saved ? 'fill-terracotta text-terracotta' : 'text-text-muted'}
-            />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowListPicker(true)}
+              title="Save to list"
+              className="p-2 rounded-full hover:bg-surface transition-colors"
+            >
+              <FolderPlus size={20} className="text-text-muted" />
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  if (saved) {
+                    await api.wishlist.remove(id);
+                    setSaved(false);
+                  } else {
+                    await api.wishlist.add(id);
+                    setSaved(true);
+                  }
+                } catch { /* ignore */ }
+              }}
+              className="p-2 rounded-full hover:bg-surface transition-colors"
+            >
+              <Bookmark
+                size={20}
+                className={saved ? 'fill-terracotta text-terracotta' : 'text-text-muted'}
+              />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -432,6 +442,193 @@ export default function ExperienceDetail() {
               </Card>
             ))}
           </div>
+        </div>
+      </div>
+
+      {showListPicker && (
+        <ListPickerModal
+          experienceId={id}
+          experienceName={experience.name}
+          onClose={() => setShowListPicker(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Save-to-list modal ────────────────────────────────────────────
+// Shows the current user's lists with a tap-to-toggle affordance, plus
+// an inline "Create new list" row so the whole flow happens here without
+// leaving the experience detail page.
+function ListPickerModal({ experienceId, experienceName, onClose }) {
+  const [lists, setLists] = useState(null);     // null = loading
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState({});   // { [listId]: 'adding' | 'removing' | 'done' }
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const mine = await api.lists.getMine();
+        if (ignore) return;
+        // Each list from backend carries item_count; we mark which already
+        // contain this experience by fetching items for each. For an MVP
+        // with few lists per user this is fine; optimise later if needed.
+        const withMembership = await Promise.all(
+          (Array.isArray(mine) ? mine : []).map(async (l) => {
+            try {
+              const items = await api.lists.getExperiences(l.id);
+              const has = Array.isArray(items) && items.some((i) => i.id === experienceId);
+              return { ...l, has };
+            } catch {
+              return { ...l, has: false };
+            }
+          })
+        );
+        setLists(withMembership);
+      } catch (e) {
+        if (!ignore) setError(e.message || 'Failed to load lists');
+      }
+    })();
+    return () => { ignore = true; };
+  }, [experienceId]);
+
+  const toggle = async (list) => {
+    setPending((p) => ({ ...p, [list.id]: list.has ? 'removing' : 'adding' }));
+    try {
+      if (list.has) {
+        await api.lists.removeItem(list.id, experienceId);
+      } else {
+        await api.lists.addItem(list.id, experienceId);
+      }
+      setLists((ls) => ls.map((l) => (l.id === list.id ? { ...l, has: !l.has } : l)));
+      setPending((p) => ({ ...p, [list.id]: 'done' }));
+    } catch (e) {
+      setError(e.message || 'Save failed');
+      setPending((p) => ({ ...p, [list.id]: undefined }));
+    }
+  };
+
+  const createAndAdd = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setCreating(true);
+    setError('');
+    try {
+      const created = await api.lists.create({ name, description: '', is_public: true });
+      await api.lists.addItem(created.id, experienceId);
+      setLists((ls) => [{ ...created, has: true }, ...(ls || [])]);
+      setShowCreate(false);
+      setNewName('');
+    } catch (e) {
+      setError(e.message || 'Could not create list');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="bg-cream rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-stone-light">
+          <div>
+            <h2 className="font-serif text-lg font-bold">Save to list</h2>
+            <p className="text-xs text-text-muted mt-0.5 truncate max-w-[260px]">{experienceName}</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-surface">
+            <X size={18} className="text-text-muted" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2">
+          {/* Create new list row */}
+          {showCreate ? (
+            <div className="flex items-center gap-2 p-3">
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') createAndAdd(); }}
+                placeholder="Name your list"
+                className="flex-1 px-3 py-2 rounded-xl bg-white/60 text-sm focus:outline-none"
+                maxLength={200}
+              />
+              <button
+                onClick={createAndAdd}
+                disabled={creating || !newName.trim()}
+                className="px-3 py-2 rounded-xl bg-terracotta text-white text-sm font-semibold disabled:opacity-50"
+              >
+                {creating ? '…' : 'Create'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors text-left"
+            >
+              <div className="w-8 h-8 rounded-full bg-terracotta/15 flex items-center justify-center">
+                <Plus size={16} className="text-terracotta" />
+              </div>
+              <span className="text-sm font-semibold text-terracotta">Create new list</span>
+            </button>
+          )}
+
+          <div className="h-px bg-stone-light my-1" />
+
+          {lists === null && (
+            <p className="p-4 text-sm text-text-muted">Loading your lists…</p>
+          )}
+
+          {lists && lists.length === 0 && (
+            <p className="p-4 text-sm text-text-muted">
+              No lists yet. Create one above to start saving places.
+            </p>
+          )}
+
+          {lists && lists.map((list) => {
+            const state = pending[list.id];
+            return (
+              <button
+                key={list.id}
+                onClick={() => toggle(list)}
+                disabled={state === 'adding' || state === 'removing'}
+                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors text-left"
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                  list.has ? 'bg-terracotta border-terracotta' : 'border-stone'
+                }`}>
+                  {list.has && <Check size={14} className="text-white" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-primary-text truncate">{list.name}</p>
+                  <p className="text-xs text-text-muted">
+                    {list.item_count || 0} {list.item_count === 1 ? 'place' : 'places'}
+                  </p>
+                </div>
+                {state === 'adding' && <span className="text-xs text-text-muted">Adding…</span>}
+                {state === 'removing' && <span className="text-xs text-text-muted">Removing…</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {error && (
+          <p className="text-xs text-red-500 px-4 pb-2">{error}</p>
+        )}
+
+        <div className="p-3 border-t border-stone-light">
+          <button
+            onClick={onClose}
+            className="w-full py-2 rounded-xl bg-surface text-sm font-semibold text-primary-text"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>

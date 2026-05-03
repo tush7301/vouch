@@ -21,17 +21,27 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         fromService:
-          name: vouch-web
+          name: vouchnyc
           type: web
           property: host
       - key: GOOGLE_PLACES_API_KEY
         sync: false
       - key: TICKETMASTER_API_KEY
         sync: false
+      # OAuth: paste from Google Cloud Console → OAuth credentials.
+      # Must match the client ID hardcoded in frontend/src/pages/Login.jsx.
+      # Also add https://vouchnyc.onrender.com to that client's
+      # "Authorized JavaScript origins" before signing in works.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      # Gate for /users/admin/promote-tastemaker. Used by populate_tastemakers.py
+      # during seeding only. Rotate from the Render dashboard after seeding.
+      - key: ADMIN_SECRET
+        value: vouch-tastemaker-seed-2026-q2-internal
 
   # --- Frontend Static Site ---
   - type: web
-    name: vouch-web
+    name: vouchnyc
     runtime: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
@@ -40,8 +50,14 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      # Hardcoded full public URL — Render's fromService.host returns the
+      # INTERNAL network name (e.g. "vouch-api-5pa4"), not the public
+      # .onrender.com URL, which breaks the static site build.
       - key: VITE_API_URL
-        fromService:
-          name: vouch-api
-          type: web
-          property: host
+        value: https://vouch-api-5pa4.onrender.com
+      # Google OAuth client ID — baked into the frontend bundle at build time.
+      # Must equal the backend's GOOGLE_CLIENT_ID and match the client in
+      # Google Cloud Console → Credentials → OAuth 2.0 client.
+      # Client IDs are public (safe to embed), so hardcoding is fine too.
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false

@@ -22,17 +22,27 @@ app = FastAPI(
 )
 
 # CORS — allow frontend dev server and production URL
+# Hardcoded production origins as fallback: Render's fromService.host doesn't
+# always update on rename, and we'd rather not be one env var away from a CORS
+# outage. Add new prod origins here when they appear.
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://vouchnyc.onrender.com",
+    "https://vouch-web.onrender.com",  # legacy, harmless to keep during transition
 ]
 if os.getenv("FRONTEND_URL"):
     frontend = os.getenv("FRONTEND_URL")
-    _cors_origins.append(frontend if frontend.startswith("http") else f"https://{frontend}")
+    derived = frontend if frontend.startswith("http") else f"https://{frontend}"
+    if derived not in _cors_origins:
+        _cors_origins.append(derived)
 
+# Also allow any *.onrender.com preview/branch deploy via regex — keeps CI
+# environments and accidental URL changes from CORS-denying themselves.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

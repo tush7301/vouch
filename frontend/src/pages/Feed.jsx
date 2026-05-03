@@ -28,24 +28,49 @@ const CATEGORY_QUERIES = {
   'Social Scenes': 'bars clubs lounges nightlife',
 };
 
-// ── Friend activity card ───────────────────────────────────────
+// ── Feed card — handles friend_activity, vouch_pick, and trending items ──
 function FriendActivityCard({ item, saved, onToggleSave, onClick }) {
-  const { experience: exp, rating, user, time_ago } = item;
-  if (!exp || !user) return null;
+  const { experience: exp, rating, user, time_ago, type } = item;
+  if (!exp) return null;
+
+  const isFriendActivity = type === 'friend_activity';
+  const isPick = type === 'vouch_pick';
+  const isTrending = type === 'trending';
 
   return (
     <div className="glass rounded-2xl overflow-hidden cursor-pointer group" onClick={onClick}>
-      {/* User header */}
+      {/* Header — user attribution for friend activity, badge for picks/trending */}
       <div className="flex items-center gap-3 px-4 pt-3.5 pb-2">
-        <Avatar name={user.display_name} src={user.avatar_url} size="sm" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-primary-text leading-tight truncate">
-            {user.display_name}
-            <span className="font-normal text-secondary-text"> vouched for</span>
-          </p>
-          <p className="text-xs text-secondary-text">{time_ago}</p>
-        </div>
-        {rating && (
+        {isFriendActivity && user ? (
+          <>
+            <Avatar name={user.display_name} src={user.avatar_url} size="sm" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-primary-text leading-tight truncate">
+                {user.display_name}
+                <span className="font-normal text-secondary-text"> vouched for</span>
+              </p>
+              <p className="text-xs text-secondary-text">{time_ago}</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isPick ? 'bg-amber/15' : 'bg-terracotta/15'}`}>
+              {isPick ? (
+                <Award size={14} className="text-amber" />
+              ) : (
+                <Flame size={14} className="text-terracotta" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-primary-text leading-tight truncate">
+                {isPick ? 'Vouch Pick' : 'Trending now'}
+                <span className="font-normal text-secondary-text"> · {exp.category}</span>
+              </p>
+              <p className="text-xs text-secondary-text truncate">{time_ago}</p>
+            </div>
+          </>
+        )}
+        {rating?.overall_score > 0 && (
           <div className="shrink-0 flex items-center gap-1 bg-amber/10 px-2 py-0.5 rounded-full">
             <Star size={11} className="text-amber fill-amber" />
             <span className="text-xs font-bold text-amber">{rating.overall_score?.toFixed(1)}</span>
@@ -235,7 +260,11 @@ export default function Feed() {
     api.feed.get(null, null, effectiveLocation.latitude, effectiveLocation.longitude)
       .then((data) => {
         const items = data?.items || [];
-        setFeedItems(items.filter((i) => i.type === 'friend_activity' || i.type === 'trending'));
+        // For You = friend activity + vouch picks + trending (all already
+        // scoped to the user's categories + city by the backend). This way
+        // a brand-new user with 0 follows still sees category-matched
+        // highly-rated places in their city, not a "follow people" empty state.
+        setFeedItems(items);
         setVouchPicks(items.filter((i) => i.type === 'vouch_pick'));
       })
       .catch(() => {})
@@ -329,52 +358,101 @@ export default function Feed() {
               <Loader2 className="w-7 h-7 text-terracotta animate-spin" />
             </div>
           ) : (
-            <>
-              {/* Friend activity / trending feed — one card per screen */}
-              <div className="mt-6 px-4 lg:px-8">
-                {feedItems.length > 0 ? (
-                  <>
-                    {feedItems[0]?.type === 'friend_activity' && (
-                      <h2 className="font-serif text-base font-bold flex items-center gap-2 max-w-[600px] mx-auto mb-3">
-                        <Users size={16} className="text-terracotta" />
-                        From people you follow
-                      </h2>
-                    )}
-                    {feedItems[0]?.type === 'trending' && (
-                      <h2 className="font-serif text-base font-bold flex items-center gap-2 max-w-[600px] mx-auto mb-3">
-                        <Flame size={16} className="text-terracotta" />
-                        Trending now
-                      </h2>
-                    )}
-                    <div className="max-w-[600px] mx-auto space-y-4">
-                      {feedItems.map((item, i) => (
-                        <FriendActivityCard
-                          key={item.rating?.id || i}
-                          item={item}
-                          saved={savedState[item.experience?.id] || false}
-                          onToggleSave={toggleWishlist}
-                          onClick={() => goToExp(item)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="py-12 text-center glass rounded-2xl max-w-[600px] mx-auto">
-                    <Users size={32} className="mx-auto text-stone mb-3" />
-                    <h3 className="font-serif font-bold">Follow people to see their picks</h3>
-                    <p className="text-sm text-secondary-text mt-1 mb-4">
-                      Your feed fills up with vouches from friends.
-                    </p>
-                    <button
-                      onClick={() => navigate('/friends')}
-                      className="bg-charcoal text-cream px-6 py-2 rounded-full font-semibold text-sm hover:bg-terracotta transition-fluid"
-                    >
-                      Find friends
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
+            <div className="mt-6 px-4 lg:px-8">
+              {feedItems.length > 0 ? (
+                <div className="max-w-[600px] mx-auto space-y-5">
+                  {(() => {
+                    // Group items by type, preserving backend order within each group.
+                    const friendItems = feedItems.filter((i) => i.type === 'friend_activity');
+                    const pickItems = feedItems.filter((i) => i.type === 'vouch_pick');
+                    const trendingItems = feedItems.filter((i) => i.type === 'trending');
+                    const sections = [];
+
+                    if (friendItems.length > 0) {
+                      sections.push(
+                        <section key="friends">
+                          <h2 className="font-serif text-base font-bold flex items-center gap-2 mb-3">
+                            <Users size={16} className="text-terracotta" />
+                            From people you follow
+                          </h2>
+                          <div className="space-y-4">
+                            {friendItems.map((item, i) => (
+                              <FriendActivityCard
+                                key={item.rating?.id || `f${i}`}
+                                item={item}
+                                saved={savedState[item.experience?.id] || false}
+                                onToggleSave={toggleWishlist}
+                                onClick={() => goToExp(item)}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    }
+
+                    if (pickItems.length > 0) {
+                      sections.push(
+                        <section key="picks">
+                          <h2 className="font-serif text-base font-bold flex items-center gap-2 mb-3">
+                            <Award size={16} className="text-terracotta" />
+                            Picks for you in {displayCity}
+                          </h2>
+                          <div className="space-y-4">
+                            {pickItems.map((item, i) => (
+                              <FriendActivityCard
+                                key={item.experience?.id || `p${i}`}
+                                item={item}
+                                saved={savedState[item.experience?.id] || false}
+                                onToggleSave={toggleWishlist}
+                                onClick={() => goToExp(item)}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    }
+
+                    if (trendingItems.length > 0) {
+                      sections.push(
+                        <section key="trending">
+                          <h2 className="font-serif text-base font-bold flex items-center gap-2 mb-3">
+                            <Flame size={16} className="text-terracotta" />
+                            Trending in {displayCity}
+                          </h2>
+                          <div className="space-y-4">
+                            {trendingItems.map((item, i) => (
+                              <FriendActivityCard
+                                key={item.experience?.id || `t${i}`}
+                                item={item}
+                                saved={savedState[item.experience?.id] || false}
+                                onToggleSave={toggleWishlist}
+                                onClick={() => goToExp(item)}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      );
+                    }
+
+                    return sections;
+                  })()}
+                </div>
+              ) : (
+                <div className="py-12 text-center glass rounded-2xl max-w-[600px] mx-auto">
+                  <Users size={32} className="mx-auto text-stone mb-3" />
+                  <h3 className="font-serif font-bold">Your feed is empty</h3>
+                  <p className="text-sm text-secondary-text mt-1 mb-4">
+                    Follow friends and tastemakers to fill it up.
+                  </p>
+                  <button
+                    onClick={() => navigate('/friends')}
+                    className="bg-charcoal text-cream px-6 py-2 rounded-full font-semibold text-sm hover:bg-terracotta transition-fluid"
+                  >
+                    Find friends
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

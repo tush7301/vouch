@@ -180,6 +180,28 @@ export default function Login() {
             Continue with Google
           </button>
 
+          <button
+            onClick={handleInstagram}
+            disabled
+            title="Instagram sign-in is coming soon"
+            className="flex items-center justify-center gap-3 w-full py-3 px-4 rounded-full glass-input font-semibold text-sm opacity-50 cursor-not-allowed transition-fluid relative"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <defs>
+                <linearGradient id="ig" x1="0" y1="24" x2="24" y2="0" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#FFDC80" />
+                  <stop offset=".5" stopColor="#F56040" />
+                  <stop offset="1" stopColor="#833AB4" />
+                </linearGradient>
+              </defs>
+              <rect x="2" y="2" width="20" height="20" rx="6" stroke="url(#ig)" strokeWidth="2" />
+              <circle cx="12" cy="12" r="5" stroke="url(#ig)" strokeWidth="2" />
+              <circle cx="17.5" cy="6.5" r="1.5" fill="url(#ig)" />
+            </svg>
+            Continue with Instagram
+            <span className="absolute right-3 text-[9px] uppercase tracking-wider text-text-muted font-bold">Soon</span>
+          </button>
+
           <div className="flex items-center gap-3 my-1">
             <span className="flex-1 h-px bg-white/40" />
             <span className="text-xs text-text-muted">or</span>
