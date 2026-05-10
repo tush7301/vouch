@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ChipStrip from '../components/ui/ChipStrip';
 import LocationPicker from '../components/ui/LocationPicker';
 import { useLocation } from '../context/LocationContext';
-import { LocateFixed, MapPin as MapPinIcon } from 'lucide-react';
+import { LocateFixed, MapPin as MapPinIcon, Navigation, Crosshair } from 'lucide-react';
 import VouchScore from '../components/ui/VouchScore';
 import ScoreLabel from '../components/ui/ScoreLabel';
 import CategoryTag from '../components/ui/CategoryTag';
@@ -32,12 +32,64 @@ function createIcon(color, size = 28) {
   });
 }
 
-// All pins use the Vouch terracotta tint; rated pins are fully opaque,
-// unrated pins dial the opacity back slightly so they visually recede.
+// Rated pins glow brighter the higher the score; unrated pins recede to a
+// muted stone tint so rated places naturally pop against the seeded sea of
+// Google-Places pins.
 function iconForScore(avg) {
-  const size = avg > 0 ? 30 : 26;
-  const color = avg > 0 ? COLORS.terracotta : COLORS.terracotta + 'B3'; // ~70% opacity hex
-  return createIcon(color, size);
+  if (avg <= 0) {
+    // Seeded place with no Vouch ratings yet — small + muted
+    return createIcon('#A8988A', 22);
+  }
+  if (avg >= 8.5) return createIcon(COLORS.terracotta, 34);
+  if (avg >= 7.0) return createIcon(COLORS.terracotta, 30);
+  return createIcon(COLORS.terracotta + 'CC', 28);
+}
+
+// ── "Recenter to my location" helper ──────────────────────────
+function RecenterControl({ lat, lng, onClick }) {
+  const map = useMap();
+  const handleClick = () => {
+    map.setView([lat, lng], 13);
+    onClick?.();
+  };
+  return (
+    <button
+      onClick={handleClick}
+      title="Recenter to your location"
+      className="absolute bottom-4 right-3 z-[1000] w-10 h-10 rounded-full bg-warm-white/95 backdrop-blur-sm shadow-md border border-stone-light flex items-center justify-center hover:bg-warm-white hover:border-terracotta transition-fluid"
+    >
+      <Crosshair size={16} className="text-charcoal" />
+    </button>
+  );
+}
+
+// ── "Find me" — browser geolocation, falls back to set location on error ──
+function GeolocateControl({ onLocated }) {
+  const map = useMap();
+  const [busy, setBusy] = useState(false);
+  const handleClick = () => {
+    if (!navigator.geolocation) return;
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        map.setView([latitude, longitude], 14);
+        onLocated?.(latitude, longitude);
+        setBusy(false);
+      },
+      () => { setBusy(false); },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  };
+  return (
+    <button
+      onClick={handleClick}
+      title="Find me"
+      className="absolute bottom-[60px] right-3 z-[1000] w-10 h-10 rounded-full bg-warm-white/95 backdrop-blur-sm shadow-md border border-stone-light flex items-center justify-center hover:bg-warm-white hover:border-terracotta transition-fluid"
+    >
+      <Navigation size={16} className={busy ? 'text-terracotta animate-pulse' : 'text-charcoal'} />
+    </button>
+  );
 }
 
 // ── Layer definitions ──────────────────────────────────────────
@@ -121,6 +173,18 @@ export default function MapPage() {
     setSelectedCategory(cat === selectedCategory ? null : cat);
   };
 
+  // Split rated vs. unrated so we can surface a "X vouched · Y to discover"
+  // breakdown — makes the map feel less like a directory and more like a
+  // social map where some pins are glowing recommendations.
+  const { ratedCount, unratedCount } = useMemo(() => {
+    let rated = 0; let unrated = 0;
+    for (const p of pins) {
+      if (p.avg_score > 0) rated += 1;
+      else unrated += 1;
+    }
+    return { ratedCount: rated, unratedCount: unrated };
+  }, [pins]);
+
   return (
     <div className="pb-20 lg:pb-0 h-[100dvh] flex flex-col">
       {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
@@ -168,14 +232,32 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Pin count badge — scoped to current city + category filter */}
-        <div className="absolute top-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-full px-3 py-1 shadow-sm border border-stone-light">
-          <span className="text-xs font-semibold text-primary-text">
-            {pins.length} {selectedCategory ? selectedCategory : 'places'}
-            {location && activeLayer === 'all' && (
-              <span className="text-secondary-text font-normal"> in {location.city.split(',')[0]}</span>
+        {/* Pin count badge — scoped to current city + category filter.
+            Shows "X vouched · Y to discover" when the layer mixes rated and
+            un-rated places, so users see the social signal at a glance. */}
+        <div className="absolute top-3 left-3 z-[1000] bg-warm-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-stone-light">
+          <div className="flex items-center gap-2 text-xs">
+            {ratedCount > 0 && unratedCount > 0 ? (
+              <>
+                <span className="flex items-center gap-1 font-semibold text-terracotta">
+                  <span className="w-1.5 h-1.5 rounded-full bg-terracotta" />
+                  {ratedCount} vouched
+                </span>
+                <span className="text-stone">·</span>
+                <span className="flex items-center gap-1 text-secondary-text">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone" />
+                  {unratedCount} to discover
+                </span>
+              </>
+            ) : (
+              <span className="font-semibold text-primary-text">
+                {pins.length} {selectedCategory ? selectedCategory : 'places'}
+                {location && activeLayer === 'all' && (
+                  <span className="text-secondary-text font-normal"> in {location.city.split(',')[0]}</span>
+                )}
+              </span>
             )}
-          </span>
+          </div>
         </div>
 
         {/* Empty state for filtered layers */}
@@ -200,6 +282,13 @@ export default function MapPage() {
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
         >
+          {/* Custom-positioned zoom control (top-right, below the pin count) */}
+          <ZoomControl position="topright" />
+
+          {/* Find-me + recenter overlay buttons (positioned absolutely) */}
+          <GeolocateControl />
+          {location && <RecenterControl lat={location.latitude} lng={location.longitude} />}
+
           {/* CartoDB Positron, warm-tinted via CSS to match the cream palette. */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
