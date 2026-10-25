@@ -28,7 +28,8 @@ app = FastAPI(
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://vouchnyc.onrender.com",
+    "https://vouchnyc-khka.onrender.com",
+    "https://vouchnyc.onrender.com",  # legacy, harmless to keep during transition
     "https://vouch-web.onrender.com",  # legacy, harmless to keep during transition
 ]
 if os.getenv("FRONTEND_URL"):

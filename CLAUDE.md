@@ -9,8 +9,12 @@ Read this before making changes — most landmines are documented here.
 nightlife, fitness, arts, events, sports) on three dimensions — vibe, value,
 experience — and see ratings ranked by friends + tastemakers they trust.
 
-- **Live:** https://vouchnyc.onrender.com
-- **API:** https://vouch-api-evyg.onrender.com
+- **Live:** https://vouchnyc-khka.onrender.com
+- **API:** https://vouch-api-evyg.onrender.com (`/health`, `/docs`)
+- **Render Blueprint:** "vouch" on `tush7301/vouch` @ `main` (recreated 2026-10-25;
+  the old `vouchnyc.onrender.com` / `vouch-api-5pa4` services are gone)
+- **Google Cloud:** project "Vouch" (`snappy-cistern-490013-i4`) — Places key
+  "Vouch Places" + OAuth client "Vouch"
 - **Tagline:** *Your social life, ranked.*
 
 Built for Columbia Startup Studio (Spring 2026), team **basket-architects**
@@ -21,6 +25,7 @@ Built for Columbia Startup Studio (Spring 2026), team **basket-architects**
 | Layer | Tech |
 |---|---|
 | Frontend | React 19 + Vite 7 + Tailwind CSS 4 + React Router 6 + React Leaflet |
+| Map tiles | Esri World Light Gray Canvas (base + reference labels, keyless) |
 | Backend | FastAPI + SQLAlchemy 2 + Alembic + psycopg2 |
 | DB | PostgreSQL (Render managed) |
 | Auth | Email/password (JWT) + Google OAuth (GIS ID-token flow) |
@@ -41,6 +46,7 @@ backend/
     config.py       # env-var loader (DATABASE_URL, *_API_KEY, etc.)
   alembic/          # migrations — see "migrations" gotcha below
   populate_cities.py        # seeds places from Google Places
+  refresh_photos_only.py    # re-fetches expired photo names (free SKU)
   Dockerfile
   requirements.txt
 
@@ -100,10 +106,17 @@ npm run dev
 - `vouchnyc` (static React build) — **frontend env-var changes need a
   manual redeploy**, they don't auto-rebuild on env edits
 
-Database stays warm. The `vouch-api` service has 4 critical env vars set in
-the Render dashboard (not in `render.yaml`):
-`GOOGLE_PLACES_API_KEY`, `TICKETMASTER_API_KEY`, `GOOGLE_CLIENT_ID`,
-`ADMIN_SECRET`.
+Env vars set in the Render dashboard (not in `render.yaml`):
+- `vouch-api`: `GOOGLE_PLACES_API_KEY`, `TICKETMASTER_API_KEY`, `GOOGLE_CLIENT_ID`
+- `vouchnyc`: `VITE_GOOGLE_CLIENT_ID`
+
+`ADMIN_SECRET` is currently a literal in `render.yaml` (committed) — move it
+to `sync: false` and rotate before relying on it.
+
+`vouch-db` is on Render's **free Postgres: it expires 30 days after creation
+(~2026-11-24)**, with a 14-day grace period before deletion. Upgrade to
+Basic-256mb ($6/mo) or restore a `pg_dump` into a new DB before then. See
+README → "Copying data to/from Render" and "Running costs".
 
 ## Gotchas — read before debugging
 
@@ -136,9 +149,31 @@ the Render dashboard (not in `render.yaml`):
    SQLAlchemy `text()`). Idempotent: dedupes on `google_place_id` then on
    case-insensitive name. Run cost ≈ $5/city against Google Places.
 
-8. **Frontend `lib/constants.js` API URL resolver** falls back to the
-   prod API hostname when `VITE_API_URL` is missing, so a partial Render
-   misconfig doesn't break the deployed bundle.
+8. **Frontend `lib/constants.js` API URL resolver** honors any explicit
+   `http(s)://` `VITE_API_URL` (so `http://localhost:8001` works) and bare
+   hosts containing a dot; bare internal names like `vouch-api-5pa4` are
+   rejected. With no usable value it falls back to the prod API hostname
+   (`vouch-api-evyg`) off localhost, else `http://localhost:8000`. If the
+   Blueprint is recreated, update both this fallback and `VITE_API_URL` in
+   `render.yaml`.
+
+9. **Google Places photo names expire.** `cover_photo_url` / `photo_urls`
+   store `places.googleapis.com/v1/<photo name>/media?key=...` URLs. Stale
+   names return 400 "photo resource … invalid" with any key. Fix with
+   `python backend/refresh_photos_only.py` (field mask `photos` only →
+   Essentials IDs Only SKU, free). Rotating the Places key also requires a
+   refresh, since the key is embedded in every stored URL.
+
+10. **Places cost is driven by field masks.** `search_places` requests
+    `editorialSummary` + `rating`, which bills Text Search at the
+    Enterprise + Atmosphere tier (~$40/1K); every photo the browser loads
+    bills Place Details Photos ($7/1K after 1K free/mo). Trim field masks
+    before adding new Places calls; keep a daily quota on the key.
+
+11. **CARTO basemaps now require an API key** (unkeyed tiles render an
+    "API KEY REQUIRED" watermark), and OSM's volunteer tile servers block
+    app traffic. The map uses Esri Light Gray Canvas instead — keep the
+    attribution string in `Map.jsx`.
 
 ## Team & roles
 

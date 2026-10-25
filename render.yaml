@@ -29,8 +29,8 @@ services:
       - key: TICKETMASTER_API_KEY
         sync: false
       # OAuth: paste from Google Cloud Console → OAuth credentials.
-      # Must match the client ID hardcoded in frontend/src/pages/Login.jsx.
-      # Also add https://vouchnyc.onrender.com to that client's
+      # Must match vouchnyc's VITE_GOOGLE_CLIENT_ID.
+      # Also add https://vouchnyc-khka.onrender.com to that client's
       # "Authorized JavaScript origins" before signing in works.
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -53,6 +53,8 @@ services:
       # Hardcoded full public URL — Render's fromService.host returns the
       # INTERNAL network name (e.g. "vouch-api-5pa4"), not the public
       # .onrender.com URL, which breaks the static site build.
+      # If the Blueprint is recreated, update this and the fallback in
+      # frontend/src/lib/constants.js to the new vouch-api-xxxx host.
       - key: VITE_API_URL
         value: https://vouch-api-evyg.onrender.com
       # Google OAuth client ID — baked into the frontend bundle at build time.
