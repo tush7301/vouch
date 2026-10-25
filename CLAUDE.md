@@ -10,7 +10,7 @@ nightlife, fitness, arts, events, sports) on three dimensions — vibe, value,
 experience — and see ratings ranked by friends + tastemakers they trust.
 
 - **Live:** https://vouchnyc.onrender.com
-- **API:** https://vouch-api-5pa4.onrender.com
+- **API:** https://vouch-api-evyg.onrender.com
 - **Tagline:** *Your social life, ranked.*
 
 Built for Columbia Startup Studio (Spring 2026), team **basket-architects**

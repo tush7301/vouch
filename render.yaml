@@ -54,7 +54,7 @@ services:
       # INTERNAL network name (e.g. "vouch-api-5pa4"), not the public
       # .onrender.com URL, which breaks the static site build.
       - key: VITE_API_URL
-        value: https://vouch-api-5pa4.onrender.com
+        value: https://vouch-api-evyg.onrender.com
       # Google OAuth client ID — baked into the frontend bundle at build time.
       # Must equal the backend's GOOGLE_CLIENT_ID and match the client in
       # Google Cloud Console → Credentials → OAuth 2.0 client.

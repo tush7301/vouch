@@ -83,7 +83,7 @@ function _resolveApiBase() {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host && !/localhost|127\.0\.0\.1/.test(host)) {
-      return 'https://vouch-api-5pa4.onrender.com';
+      return 'https://vouch-api-evyg.onrender.com';
     }
   }
   return 'http://localhost:8000';
