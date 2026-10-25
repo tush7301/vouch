@@ -74,10 +74,11 @@ export const NAV_ITEMS = [
 // detection → localhost.
 function _resolveApiBase() {
   const env = import.meta.env.VITE_API_URL;
-  // A real URL must contain a dot (rules out Render's internal hostname like
+  // Accept an explicit http(s) URL (e.g. http://localhost:8001), or a bare
+  // host containing a dot (rules out Render's internal hostname like
   // "vouch-api-5pa4" that fromService.host returns — that's an internal
   // network name, not a public DNS name).
-  if (env && env.includes('.')) {
+  if (env && (env.startsWith('http') || env.includes('.'))) {
     return env.startsWith('http') ? env : `https://${env}`;
   }
   if (typeof window !== 'undefined') {

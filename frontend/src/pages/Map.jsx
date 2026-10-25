@@ -289,11 +289,18 @@ export default function MapPage() {
           <GeolocateControl />
           {location && <RecenterControl lat={location.latitude} lng={location.longitude} />}
 
-          {/* CartoDB Positron, warm-tinted via CSS to match the cream palette. */}
+          {/* Esri Light Gray Canvas (keyless; CARTO now requires an API key),
+              warm-tinted via CSS to match the cream palette. Base + labels. */}
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            subdomains="abcd"
+            attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+            maxNativeZoom={16}
+            maxZoom={20}
+            className="vouch-map-tiles"
+          />
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+            maxNativeZoom={16}
             maxZoom={20}
             className="vouch-map-tiles"
           />
